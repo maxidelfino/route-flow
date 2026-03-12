@@ -513,28 +513,29 @@ NEXT_PUBLIC_ORS_API_KEY=your-ors-api-key
 
 ## 9. Implementation Phases
 
-### Phase 1: Foundation
-- [ ] Initialize Next.js project with TypeScript + Tailwind
-- [ ] Set up PWA with next-pwa
-- [ ] Configure Leaflet map component
-- [ ] Create IndexedDB storage layer
+### Phase 1: Foundation ✅ COMPLETO
+- [x] Initialize Next.js project with TypeScript + Tailwind
+- [x] Set up PWA with next-pwa
+- [x] Configure Leaflet map component
+- [x] Create IndexedDB storage layer
 
-### Phase 2: Address Management
-- [ ] Manual address input with Nominatim autocomplete
-- [ ] OCR upload with Tesseract.js
-- [ ] Address list with drag & drop reordering
-- [ ] Address CRUD in IndexedDB
+### Phase 2: Address Management ✅ COMPLETO
+- [x] Manual address input with Nominatim autocomplete
+- [x] OCR upload with Tesseract.js
+- [x] Address list with drag & drop reordering
+- [x] Address CRUD in IndexedDB
 
-### Phase 3: Route Calculation
-- [ ] ORS matrix API integration
-- [ ] ORS directions API integration
-- [ ] Nearest Neighbor + 2-opt algorithm
+### Phase 3: Route Calculation ⚠️ PARCIAL (requiere API key)
+- [x] ORS client implementation (lib/ors.ts)
+- [x] Nearest Neighbor + 2-opt algorithm (lib/tsp.ts)
+- [x] ORS matrix API integration (pendiente API key)
+- [x] ORS directions API integration (pendiente API key)
 - [ ] Route visualization on map
 
-### Phase 4: Execution
-- [ ] GPS tracking hook
-- [ ] "Complete delivery" action
-- [ ] Dynamic route recalculation
+### Phase 4: Execution (en progreso)
+- [x] GPS tracking hook (useGPS.ts)
+- [ ] "Complete delivery" action UI
+- [ ] Dynamic route recalculation UI
 - [ ] Route deviation detection
 
 ### Phase 5: Polish
