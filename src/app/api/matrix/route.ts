@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     // Check if ORS API key is available
     if (!isApiKeyConfigured()) {
       // Use local fallback with Haversine
-      console.log('ORS API key not configured - using local fallback (Haversine)');
       const matrix = buildLocalMatrix(coordinates);
       return NextResponse.json({
         ...matrix,

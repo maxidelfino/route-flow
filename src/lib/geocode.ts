@@ -32,6 +32,16 @@ export interface SearchResult {
 }
 
 /**
+ * Raw Nominatim API response type
+ */
+export interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
+/**
  * Geocode a single address to coordinates
  * Uses cache to avoid repeated requests
  */
@@ -101,7 +111,7 @@ export async function searchAddresses(query: string): Promise<SearchResult[]> {
 
   const results = await response.json();
 
-  return results.map((r: any) => ({
+  return results.map((r: NominatimResult) => ({
     placeId: r.place_id,
     displayName: r.display_name,
     lat: parseFloat(r.lat),
@@ -129,4 +139,77 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 
   const result = await response.json();
   return result.display_name || '';
+}
+
+/**
+ * Normalize address format from OCR short format to full format
+ * e.g., "Q Junín 568" -> "Calle Junín 568"
+ * e.g., "B Arguello 123" -> "Boulevard Arguello 123"
+ * e.g., "A Corrientes 456" -> "Avenida Corrientes 456"
+ */
+export function normalizeAddressFormat(address: string): string {
+  // First normalize common abbreviations
+  let normalized = address
+    // Replace Q (Calle) at start
+    .replace(/^Q\s+/i, '')
+    // Replace B (Boulevard) at start
+    .replace(/^B\s+/i, 'Boulevard ')
+    // Replace A (Avenida) at start
+    .replace(/^A\s+/i, 'Avenida ')
+    // Common street type abbreviations
+    .replace(/\bav\.?\s+/gi, 'Avenida ')
+    .replace(/\bdr\.?\s+/gi, 'Doctor ')
+    .replace(/\bgral\.?\s+/gi, 'General ')
+    .replace(/\bpte\.?\s+/gi, 'Presidente ')
+    .replace(/\bsgto\.?\s+/gi, 'Sargento ')
+    .replace(/\bcnel\.?\s+/gi, 'Coronel ')
+    .replace(/\bint\.?\s+/gi, 'Intendente ');
+
+  // If it looks like a street address without city, add default city
+  // Pattern: Street + number at end (e.g., "Calle Junín 568")
+  const hasStreetNumber = /\d{2,5}$/.test(normalized.trim());
+  const hasCity = /(?:Buenos Aires|CABA|Ciudad|Municipio)/i.test(normalized);
+
+  if (hasStreetNumber && !hasCity) {
+    // Try to detect if it looks like a complete address already
+    const parts = normalized.split(',');
+    if (parts.length === 1) {
+      // Single line address, append default city
+      normalized = `${normalized}, Buenos Aires, Argentina`;
+    }
+  }
+
+  return normalized;
+}
+
+/**
+ * Try to geocode an address with multiple format attempts
+ * This helps with OCR-extracted addresses that may be in short format
+ */
+export async function geocodeAddressWithFallback(address: string): Promise<GeocodeResult> {
+  const formats = [
+    address,
+    normalizeAddressFormat(address),
+    `${address}, Buenos Aires, Argentina`,
+    normalizeAddressFormat(`${address}, Buenos Aires, Argentina`),
+  ];
+
+  const triedFormats: string[] = [];
+
+  for (const format of formats) {
+    if (triedFormats.includes(format.toLowerCase())) {
+      continue;
+    }
+    triedFormats.push(format.toLowerCase());
+
+    try {
+      const result = await geocodeAddress(format);
+      return result;
+    } catch (error) {
+      // Format didn't work, try next one
+      console.debug(`Geocode attempt failed for "${format}":`, error);
+    }
+  }
+
+  throw new Error(`Could not geocode address "${address}" with any format`);
 }

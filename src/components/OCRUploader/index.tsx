@@ -68,7 +68,7 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
   };
 
   return (
-    <div className="w-full p-4 bg-white rounded-lg border border-gray-200">
+    <div className="w-full p-4 bg-card rounded-lg border border-border">
       <input
         ref={fileInputRef}
         type="file"
@@ -83,7 +83,7 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
           <button
             type="button"
             onClick={handleTakePhoto}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 mx-auto cursor-pointer"
+            className="px-6 py-3 min-h-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 mx-auto cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -91,14 +91,14 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
             </svg>
             Tomar foto / Elegir imagen
           </button>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             Saca una foto de la dirección en la planilla
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {/* Image preview */}
-          <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          <div className="relative rounded-lg overflow-hidden bg-muted">
             <img
               src={imagePreview}
               alt="Captured"
@@ -116,9 +116,9 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
 
           {/* Progress bar */}
           {isProcessing && (
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-muted-foreground/20 rounded-full h-2">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-primary h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -127,13 +127,13 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
           {/* Extracted text */}
           {extractedText && !isProcessing && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Texto extraído (editable):
               </label>
               <textarea
                 value={extractedText}
                 onChange={(e) => setExtractedText(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 rows={4}
                 placeholder="Edita la dirección si es necesario..."
               />
@@ -146,7 +146,7 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
               <button
                 type="button"
                 onClick={handleReset}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 min-h-[44px] border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
               >
                 Cancelar
               </button>
@@ -154,7 +154,7 @@ export function OCRUploader({ onTextExtracted }: OCRUploaderProps) {
                 type="button"
                 onClick={handleConfirm}
                 disabled={!extractedText.trim()}
-                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 min-h-[44px] bg-success text-success-foreground rounded-lg hover:bg-success-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirmar dirección
               </button>

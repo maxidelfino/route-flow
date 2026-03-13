@@ -94,7 +94,6 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Use local optimization with Haversine distances
-      console.log('Using local route optimization (no ORS API key)');
       isFallback = true;
       result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
       const lineResult = createStraightLinePolyline(coordinates);

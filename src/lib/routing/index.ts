@@ -1,8 +1,13 @@
 /**
  * Routing Module with Fallback Support
  * 
- * This module provides routing functions with automatic fallback
- * from ORS API to local Haversine calculations.
+ * This module provides routing functions with ORS API as the PRIMARY provider
+ * and automatic fallback to local Haversine calculations.
+ * 
+ * ## Priority
+ * 
+ * 1. ORS API (when NEXT_PUBLIC_ORS_API_KEY is configured) - PRIMARY
+ * 2. Local Haversine calculations - FALLBACK
  * 
  * ## API Key Requirements
  * 
@@ -19,11 +24,12 @@
  * 
  * ## Usage
  * 
- * For automatic fallback:
+ * For automatic fallback (RECOMMENDED):
  * ```typescript
  * import { getRouteWithFallback, getMatrixWithFallback } from '@/lib/routing';
  * 
  * const result = await getRouteWithFallback(coordinates);
+ * // result.isFallback === true means ORS failed, using Haversine
  * ```
  * 
  * For local-only (no API key required):
@@ -46,6 +52,15 @@ export const { getRoute, getMatrix } = ors;
 export { isApiKeyConfigured } from '@/lib/ors';
 
 /**
+ * Step in a route leg
+ */
+export interface RouteStep {
+  instruction: string;
+  duration: number;
+  distance: number;
+}
+
+/**
  * Check if ORS API is available
  * @returns true if NEXT_PUBLIC_ORS_API_KEY is configured
  */
@@ -66,7 +81,7 @@ export async function getRouteWithFallback(
   geometry: { coordinates: number[][]; type: string };
   duration: number;
   distance: number;
-  legs: Array<{ duration: number; distance: number; steps: any[] }>;
+  legs: Array<{ duration: number; distance: number; steps: RouteStep[] }>;
   isFallback: boolean;
 }> {
   if (!isApiKeyConfigured() || useFallback) {

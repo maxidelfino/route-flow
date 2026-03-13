@@ -16,7 +16,7 @@ export function PWAInstallButton({ className = '' }: PWAInstallButtonProps) {
   return (
     <button
       onClick={prompt}
-      className={`p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-sm font-medium ${className}`}
+      className={`p-2 min-h-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm font-medium ${className}`}
       title="Instalar app"
     >
       <svg

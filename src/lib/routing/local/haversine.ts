@@ -3,6 +3,8 @@
  * Fallback implementation when ORS API key is not available
  */
 
+import { EARTH_RADIUS_KM } from '@/lib/constants';
+
 /**
  * Calculate Haversine distance between two coordinates
  * @param lat1 Latitude of point 1
@@ -17,7 +19,7 @@ export function calculateDistance(
   lat2: number,
   lng2: number
 ): number {
-  const R = 6371; // Earth's radius in km
+  const R = EARTH_RADIUS_KM;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
   const a =

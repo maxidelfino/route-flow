@@ -112,8 +112,19 @@ export function useRoute() {
 
       const result = await response.json();
 
-      // Update points with ETAs
-      const updatedPoints: RoutePoint[] = state.points.map((p, i) => ({
+      // Reorder points based on optimized route indices
+      // result.route contains indices: [0, 2, 1, 3] where 0 is start
+      // We need to map these to points (subtract 1 to skip start point)
+      const reorderedPoints: RoutePoint[] = result.route
+        .slice(1) // Skip index 0 (start point)
+        .map((routeIndex: number): RoutePoint | undefined => {
+          const pointIndex = routeIndex - 1;
+          return state.points[pointIndex];
+        })
+        .filter((p: RoutePoint | undefined): p is RoutePoint => p !== undefined);
+
+      // Update points with ETAs in the new order
+      const updatedPoints: RoutePoint[] = reorderedPoints.map((p, i) => ({
         ...p,
         eta: result.etas[i + 1], // +1 because start point is not in points
         status: (i === 0 ? 'current' : 'pending') as RoutePoint['status'],

@@ -64,6 +64,19 @@ export async function getMatrix(coordinates: number[][]): Promise<{
  * @param coordinates Array of [lng, lat] coordinates
  * @returns Route with geometry and instructions
  */
+
+export interface ORSStep {
+  instruction: string;
+  duration: number;
+  distance: number;
+}
+
+export interface ORSSegment {
+  duration: number;
+  distance: number;
+  steps: ORSStep[];
+}
+
 export interface RouteResult {
   geometry: {
     coordinates: number[][];
@@ -111,10 +124,10 @@ export async function getRoute(coordinates: number[][]): Promise<RouteResult> {
     geometry: data.features[0].geometry,
     duration: data.features[0].properties.summary.duration,
     distance: data.features[0].properties.summary.distance,
-    legs: data.features[0].properties.segments.map((seg: any) => ({
+    legs: data.features[0].properties.segments.map((seg: ORSSegment) => ({
       duration: seg.duration,
       distance: seg.distance,
-      steps: seg.steps.map((step: any) => ({
+      steps: seg.steps.map((step: ORSStep) => ({
         instruction: step.instruction,
         duration: step.duration,
         distance: step.distance,

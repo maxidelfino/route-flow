@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRoute } from '@/hooks/useRoute';
 import { useOnline } from '@/hooks/useOnline';
@@ -42,25 +42,37 @@ export default function Home() {
     loadAddresses();
   }, [loadAddresses]);
 
-  const markers: MapMarker[] = state.points.map((p) => ({
-    id: p.id,
-    lat: p.lat,
-    lng: p.lng,
-    label: p.address,
-    status: p.status === 'completed' ? 'completed' : p.status === 'current' ? 'active' : 'pending',
-  }));
+  // Build markers array: start point first, then delivery points
+  const markers: MapMarker[] = [
+    // Start point marker (if set)
+    ...(state.startPoint ? [{
+      id: 'start-point',
+      lat: state.startPoint.lat,
+      lng: state.startPoint.lng,
+      label: state.startPoint.address || 'Punto 0',
+      status: 'start' as const,
+    }] : []),
+    // Delivery point markers
+    ...state.points.map((p) => ({
+      id: p.id,
+      lat: p.lat,
+      lng: p.lng,
+      label: p.address,
+      status: p.status === 'completed' ? 'completed' as const : p.status === 'current' ? 'active' as const : 'pending' as const,
+    })),
+  ];
 
   // Build route coordinates from startPoint + points in order (straight lines)
   const routeCoords: [number, number][] = [];
   
   // Add start point first if exists
   if (state.startPoint) {
-    routeCoords.push([state.startPoint.lat, state.startPoint.lng]);
+    routeCoords.push([state.startPoint.lng, state.startPoint.lat]);
   }
   
   // Add each point in order
   state.points.forEach(p => {
-    routeCoords.push([p.lat, p.lng]);
+    routeCoords.push([p.lng, p.lat]);
   });
 
   const mapCenter = state.startPoint 
@@ -132,11 +144,23 @@ export default function Home() {
     }
   };
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const showExecutionPanel = state.status !== 'idle' && state.status !== 'loading';
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-zinc-50 dark:bg-black">
+    <div className="flex flex-col md:flex-row h-screen bg-background">
       {/* Offline Banner */}
       {!isOnline && <OfflineBanner />}
       
@@ -164,11 +188,11 @@ export default function Home() {
       {/* Control Panel */}
       <div className={`
         ${isMobile ? 'flex-1 flex flex-col' : 'w-96 flex flex-col'}
-        bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-800
+        bg-surface border-l border-border
       `}>
         {/* Mobile: StartPointSelector at top */}
         {isMobile && (
-          <div className="p-3 border-b border-gray-200">
+          <div className="p-3 border-b border-border">
             <StartPointSelector
               onStartPointSelect={setStartPoint}
               initialPoint={state.startPoint || undefined}
@@ -187,13 +211,13 @@ export default function Home() {
 
         {/* Mobile Tabs */}
         {isMobile && (
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-border">
             <button
               onClick={() => setActiveTab('addresses')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'addresses' 
-                  ? 'text-blue-500 border-b-2 border-blue-500' 
-                  : 'text-gray-500'
+                  ? 'text-primary border-b-2 border-primary' 
+                  : 'text-muted-foreground'
               }`}
             >
               Direcciones
@@ -202,8 +226,8 @@ export default function Home() {
               onClick={() => setActiveTab('ocr')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'ocr' 
-                  ? 'text-blue-500 border-b-2 border-blue-500' 
-                  : 'text-gray-500'
+                  ? 'text-primary border-b-2 border-primary' 
+                  : 'text-muted-foreground'
               }`}
             >
               OCR
@@ -212,8 +236,8 @@ export default function Home() {
               onClick={() => setActiveTab('execution')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 activeTab === 'execution' 
-                  ? 'text-blue-500 border-b-2 border-blue-500' 
-                  : 'text-gray-500'
+                  ? 'text-primary border-b-2 border-primary' 
+                  : 'text-muted-foreground'
               }`}
             >
               Ejecutar
@@ -228,7 +252,7 @@ export default function Home() {
           
           {(!isMobile || activeTab === 'addresses') && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-foreground">
                 Agregar Direcciones
               </h2>
               
@@ -246,7 +270,7 @@ export default function Home() {
 
           {(!isMobile || activeTab === 'ocr') && (
             <div className="mt-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <h2 className="text-lg font-semibold text-foreground mb-4">
                 OCR
               </h2>
               <OCRUploader onTextExtracted={handleOCRTextExtracted} />
@@ -287,10 +311,10 @@ export default function Home() {
 
         {/* Calculate Route Button */}
         {state.status === 'ready' && (
-          <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
+          <div className="p-4 border-t border-border">
             <button
               onClick={handleStartExecution}
-              className="w-full py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
+              className="w-full py-3 min-h-[44px] bg-success text-success-foreground font-medium rounded-lg hover:bg-success-hover transition-colors"
             >
               Iniciar Recorrido
             </button>
@@ -298,11 +322,11 @@ export default function Home() {
         )}
 
         {state.points.length > 0 && state.status !== 'ready' && state.status !== 'executing' && state.status !== 'completed' && (
-          <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
+          <div className="p-4 border-t border-border">
             <button
               onClick={handleCalculateRoute}
               disabled={state.status === 'loading'}
-              className="w-full py-3 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 min-h-[44px] bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {state.status === 'loading' ? (
                 <>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useGPS, GPSPosition } from '@/hooks/useGPS';
+import { useGPS } from '@/hooks/useGPS';
 
 interface ExecutionPanelProps {
   isActive: boolean;
@@ -38,18 +38,18 @@ export function ExecutionPanel({
   };
 
   const getAccuracyColor = (accuracy: number): string => {
-    if (accuracy < 10) return 'text-green-600';
-    if (accuracy < 30) return 'text-yellow-600';
-    return 'text-red-600';
+    if (accuracy < 10) return 'text-success';
+    if (accuracy < 30) return 'text-warning';
+    return 'text-error';
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 space-y-4">
+    <div className="bg-card rounded-lg shadow-md p-4 space-y-4">
       {/* GPS Status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-          <span className="text-sm text-gray-600">
+          <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-success animate-pulse' : 'bg-muted-foreground'}`} />
+          <span className="text-sm text-muted-foreground">
             {isTracking ? 'GPS activo' : 'GPS inactivo'}
           </span>
         </div>
@@ -63,16 +63,16 @@ export function ExecutionPanel({
 
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="bg-error-light border border-error rounded-lg p-3">
+          <p className="text-sm text-error">{error}</p>
         </div>
       )}
 
       {/* Position display */}
       {position && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500 mb-1">Tu posición</p>
-          <p className="text-sm font-mono text-gray-700">
+        <div className="bg-muted rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Tu posición</p>
+          <p className="text-sm font-mono text-foreground">
             {position.lat.toFixed(6)}, {position.lng.toFixed(6)}
           </p>
         </div>
@@ -83,7 +83,7 @@ export function ExecutionPanel({
         <div className="grid grid-cols-2 gap-3 pt-2">
           <button
             onClick={onAddStop}
-            className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+            className="px-4 py-3 min-h-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -93,7 +93,7 @@ export function ExecutionPanel({
 
           <button
             onClick={onComplete}
-            className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+            className="px-4 py-3 min-h-[44px] bg-success text-success-foreground rounded-lg hover:bg-success-hover transition-colors flex items-center justify-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -107,7 +107,7 @@ export function ExecutionPanel({
       {isActive && (
         <button
           onClick={onCancel}
-          className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          className="w-full px-4 py-2 min-h-[44px] border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm"
         >
           Cancelar recorrido
         </button>

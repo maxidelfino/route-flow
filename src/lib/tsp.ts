@@ -1,3 +1,6 @@
+import { DEFAULT_ALPHA, DEFAULT_BETA } from './constants';
+import { calculateDistance, estimateDuration } from './routing/local/haversine';
+
 export interface Point {
   id: string;
   lat: number;
@@ -15,10 +18,6 @@ export interface RouteResult {
   totalDistance: number;
   etas: number[];
 }
-
-// Default weights: prioritize time over distance
-const DEFAULT_ALPHA = 0.7; // time weight
-const DEFAULT_BETA = 0.3;  // distance weight
 
 /**
  * Calculate weighted cost from duration and distance
@@ -231,33 +230,6 @@ export function optimizeAndCalculate(
 // ============================================
 
 /**
- * Calculate Haversine distance between two points (in km)
- */
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function toRad(deg: number): number {
-  return deg * (Math.PI / 180);
-}
-
-/**
- * Estimate duration from distance (assuming 30 km/h average in city)
- * This is a rough estimate without real road data
- */
-function estimateDuration(distanceKm: number): number {
-  const avgSpeedKmh = 30; // 30 km/h average for city delivery
-  return (distanceKm / avgSpeedKmh) * 3600; // Convert to seconds
-}
-
-/**
  * Build a local matrix using Haversine distances
  */
 function buildLocalMatrix(points: Point[], startPoint?: { lat: number; lng: number }): Matrix {
@@ -279,7 +251,7 @@ function buildLocalMatrix(points: Point[], startPoint?: { lat: number; lng: numb
         distances[i][j] = 0;
         durations[i][j] = 0;
       } else {
-        const dist = haversineDistance(
+        const dist = calculateDistance(
           allPoints[i].lat,
           allPoints[i].lng,
           allPoints[j].lat,
@@ -309,8 +281,8 @@ export function optimizeRouteLocal(
   // Build local matrix with Haversine
   const matrix = buildLocalMatrix(points, startPoint);
 
-  // Start from point 0 (which corresponds to startPoint in the matrix)
-  const route = optimizeRoute(points, 0, matrix);
+  // Start from point 1 (which corresponds to points[0] in the matrix, since index 0 is startPoint)
+  const route = optimizeRoute(points, 1, matrix);
   const stats = calculateRouteStats(route, matrix);
   const etas = calculateETAs(route, matrix);
 

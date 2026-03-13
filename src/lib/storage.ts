@@ -149,9 +149,8 @@ export const cacheStorage = {
 
   async set<T>(key: string, data: T, ttlMinutes = 24 * 60): Promise<void> {
     const db = await getDB();
-    const cacheKey = `cache_${key}`;
     await db.put('cache', {
-      key: cacheKey,
+      key: key,
       data,
       expiresAt: Date.now() + ttlMinutes * 60 * 1000,
     } as RouteFlowDB['cache']['value']);
@@ -159,7 +158,7 @@ export const cacheStorage = {
 
   async delete(key: string): Promise<void> {
     const db = await getDB();
-    await db.delete('cache', `cache_${key}`);
+    await db.delete('cache', key);
   },
 };
 
