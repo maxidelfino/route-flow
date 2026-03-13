@@ -1,65 +1,321 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { useRoute } from '@/hooks/useRoute';
+import { useOnline } from '@/hooks/useOnline';
+import { AddressInput } from '@/components/AddressInput';
+import { AddressList, AddressListRef } from '@/components/AddressList';
+import { OCRUploader } from '@/components/OCRUploader';
+import { ExecutionPanel } from '@/components/ExecutionPanel';
+import { RouteInfo } from '@/components/RouteInfo';
+import { StartPointSelector } from '@/components/StartPointSelector';
+import { MapMarker } from '@/components/Map';
+import { OfflineBanner } from '@/components/OfflineBanner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ErrorToast } from '@/components/ErrorToast';
+import { PWAInstallButton } from '@/components/PWAInstallButton';
+import { RouteSummary } from '@/components/RouteSummary';
+
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+
+type TabType = 'addresses' | 'ocr' | 'execution';
 
 export default function Home() {
+  const isOnline = useOnline();
+  const { 
+    state, 
+    setStartPoint, 
+    loadAddresses, 
+    calculateRoute, 
+    startExecution, 
+    completeCurrentPoint, 
+    reset 
+  } = useRoute();
+  
+  const [activeTab, setActiveTab] = useState<TabType>('addresses');
+  const [error, setError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const addressListRef = useRef<AddressListRef>(null);
+
+  const handleAddressesChange = useCallback(() => {
+    loadAddresses();
+  }, [loadAddresses]);
+
+  const markers: MapMarker[] = state.points.map((p) => ({
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    label: p.address,
+    status: p.status === 'completed' ? 'completed' : p.status === 'current' ? 'active' : 'pending',
+  }));
+
+  // Build route coordinates from startPoint + points in order (straight lines)
+  const routeCoords: [number, number][] = [];
+  
+  // Add start point first if exists
+  if (state.startPoint) {
+    routeCoords.push([state.startPoint.lat, state.startPoint.lng]);
+  }
+  
+  // Add each point in order
+  state.points.forEach(p => {
+    routeCoords.push([p.lat, p.lng]);
+  });
+
+  const mapCenter = state.startPoint 
+    ? [state.startPoint.lat, state.startPoint.lng] as [number, number]
+    : state.points.length > 0 
+      ? [state.points[0].lat, state.points[0].lng] as [number, number]
+      : undefined;
+
+  const handleAddressSelect = async (address: string, lat?: number, lng?: number) => {
+    try {
+      await addressListRef.current?.addAddress(address, lat, lng);
+      await loadAddresses();
+    } catch {
+      setError('Error al agregar dirección');
+    }
+  };
+
+  const handleOCRTextExtracted = async (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    for (const line of lines) {
+      try {
+        await addressListRef.current?.addAddress(line.trim());
+      } catch {
+        console.error('Error adding OCR address');
+      }
+    }
+    await loadAddresses();
+    setActiveTab('addresses');
+  };
+
+  const handleCalculateRoute = async () => {
+    if (!state.startPoint) {
+      setError('Selecciona un punto de inicio');
+      return;
+    }
+    setError(null);
+    const result = await calculateRoute();
+    if (!result) {
+      setError(state.error || 'Error al calcular ruta');
+    }
+  };
+
+  const handleStartExecution = () => {
+    startExecution();
+    setActiveTab('execution');
+  };
+
+  const handleCancel = () => {
+    reset();
+    setActiveTab('addresses');
+    loadAddresses();
+  };
+
+  const handleComplete = async () => {
+    await completeCurrentPoint();
+  };
+
+  const handleRetry = async () => {
+    if (isRetrying) return;
+    
+    setIsRetrying(true);
+    try {
+      await loadAddresses();
+      setError(null);
+    } catch {
+      // Error will be set by loadAddresses
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const showExecutionPanel = state.status !== 'idle' && state.status !== 'loading';
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex flex-col md:flex-row h-screen bg-zinc-50 dark:bg-black">
+      {/* Offline Banner */}
+      {!isOnline && <OfflineBanner />}
+      
+      {/* Map Section */}
+      <div className={`${isMobile ? 'h-[40vh]' : 'flex-1'} relative`}>
+        <Map
+          center={mapCenter}
+          zoom={14}
+          markers={markers}
+          route={routeCoords}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        
+        {/* StartPointSelector overlay - desktop only */}
+        {!isMobile && (
+          <div className="absolute top-4 left-4 z-[1000] flex gap-2">
+            <StartPointSelector
+              onStartPointSelect={setStartPoint}
+              initialPoint={state.startPoint || undefined}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <PWAInstallButton />
+          </div>
+        )}
+      </div>
+
+      {/* Control Panel */}
+      <div className={`
+        ${isMobile ? 'flex-1 flex flex-col' : 'w-96 flex flex-col'}
+        bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-800
+      `}>
+        {/* Mobile: StartPointSelector at top */}
+        {isMobile && (
+          <div className="p-3 border-b border-gray-200">
+            <StartPointSelector
+              onStartPointSelect={setStartPoint}
+              initialPoint={state.startPoint || undefined}
+            />
+          </div>
+        )}
+
+        {/* Error Toast with Retry */}
+        {error && (
+          <ErrorToast
+            message={error}
+            onRetry={handleRetry}
+            isRetrying={isRetrying}
+          />
+        )}
+
+        {/* Mobile Tabs */}
+        {isMobile && (
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('addresses')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'addresses' 
+                  ? 'text-blue-500 border-b-2 border-blue-500' 
+                  : 'text-gray-500'
+              }`}
+            >
+              Direcciones
+            </button>
+            <button
+              onClick={() => setActiveTab('ocr')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'ocr' 
+                  ? 'text-blue-500 border-b-2 border-blue-500' 
+                  : 'text-gray-500'
+              }`}
+            >
+              OCR
+            </button>
+            <button
+              onClick={() => setActiveTab('execution')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'execution' 
+                  ? 'text-blue-500 border-b-2 border-blue-500' 
+                  : 'text-gray-500'
+              }`}
+            >
+              Ejecutar
+            </button>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* Desktop: Always show all components in stacked layout */}
+          {/* Mobile: Show only active tab */}
+          
+          {(!isMobile || activeTab === 'addresses') && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Agregar Direcciones
+              </h2>
+              
+              <AddressInput
+                onAddressSelect={handleAddressSelect}
+                placeholder="Buscar dirección..."
+              />
+
+              <AddressList
+                ref={addressListRef}
+                onAddressesChange={handleAddressesChange}
+              />
+            </div>
+          )}
+
+          {(!isMobile || activeTab === 'ocr') && (
+            <div className="mt-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                OCR
+              </h2>
+              <OCRUploader onTextExtracted={handleOCRTextExtracted} />
+            </div>
+          )}
+
+          {(state.status === 'completed') && (
+            <div className="mt-6">
+              <RouteSummary
+                totalDuration={state.totalDuration}
+                totalDistance={state.totalDistance}
+                completedCount={state.points.length}
+                onNewRoute={handleCancel}
+              />
+            </div>
+          )}
+
+          {(!isMobile || activeTab === 'execution') && showExecutionPanel && state.status !== 'completed' && (
+            <div className="mt-6 space-y-4">
+              <RouteInfo
+                currentPoint={state.points[state.currentIndex] || null}
+                nextPoint={state.points[state.currentIndex + 1] || null}
+                totalDuration={state.totalDuration}
+                totalDistance={state.totalDistance}
+                completedCount={state.currentIndex}
+                totalCount={state.points.length}
+              />
+
+              <ExecutionPanel
+                isActive={state.status === 'executing'}
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+                onAddStop={() => setActiveTab('addresses')}
+              />
+            </div>
+          )}
         </div>
-      </main>
+
+        {/* Calculate Route Button */}
+        {state.status === 'ready' && (
+          <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
+            <button
+              onClick={handleStartExecution}
+              className="w-full py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
+            >
+              Iniciar Recorrido
+            </button>
+          </div>
+        )}
+
+        {state.points.length > 0 && state.status !== 'ready' && state.status !== 'executing' && state.status !== 'completed' && (
+          <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
+            <button
+              onClick={handleCalculateRoute}
+              disabled={state.status === 'loading'}
+              className="w-full py-3 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {state.status === 'loading' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Calculando ruta...
+                </>
+              ) : (
+                'Calcular Ruta'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

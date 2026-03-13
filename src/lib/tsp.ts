@@ -225,3 +225,99 @@ export function optimizeAndCalculate(
     etas,
   };
 }
+
+// ============================================
+// LOCAL OPTIMIZATION (without API - uses Haversine)
+// ============================================
+
+/**
+ * Calculate Haversine distance between two points (in km)
+ */
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
+
+/**
+ * Estimate duration from distance (assuming 30 km/h average in city)
+ * This is a rough estimate without real road data
+ */
+function estimateDuration(distanceKm: number): number {
+  const avgSpeedKmh = 30; // 30 km/h average for city delivery
+  return (distanceKm / avgSpeedKmh) * 3600; // Convert to seconds
+}
+
+/**
+ * Build a local matrix using Haversine distances
+ */
+function buildLocalMatrix(points: Point[], startPoint?: { lat: number; lng: number }): Matrix {
+  const allPoints = startPoint
+    ? [{ id: 'start', lat: startPoint.lat, lng: startPoint.lng }, ...points]
+    : points;
+
+  const n = allPoints.length;
+  const distances: number[][] = Array(n)
+    .fill(null)
+    .map(() => Array(n).fill(0));
+  const durations: number[][] = Array(n)
+    .fill(null)
+    .map(() => Array(n).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) {
+        distances[i][j] = 0;
+        durations[i][j] = 0;
+      } else {
+        const dist = haversineDistance(
+          allPoints[i].lat,
+          allPoints[i].lng,
+          allPoints[j].lat,
+          allPoints[j].lng
+        );
+        distances[i][j] = dist;
+        durations[i][j] = estimateDuration(dist);
+      }
+    }
+  }
+
+  return { distances, durations };
+}
+
+/**
+ * Local route optimization using Haversine distances
+ * (without needing ORS API)
+ */
+export function optimizeRouteLocal(
+  points: Point[],
+  startPoint: { lat: number; lng: number }
+): RouteResult {
+  if (points.length === 0) {
+    return { route: [], totalDuration: 0, totalDistance: 0, etas: [] };
+  }
+
+  // Build local matrix with Haversine
+  const matrix = buildLocalMatrix(points, startPoint);
+
+  // Start from point 0 (which corresponds to startPoint in the matrix)
+  const route = optimizeRoute(points, 0, matrix);
+  const stats = calculateRouteStats(route, matrix);
+  const etas = calculateETAs(route, matrix);
+
+  return {
+    route,
+    totalDuration: stats.totalDuration,
+    totalDistance: stats.totalDistance,
+    etas,
+  };
+}

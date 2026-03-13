@@ -1,7 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Address, addressStorage, generateId } from '@/lib/storage';
+
+export interface AddressListRef {
+  addAddress: (text: string, lat?: number, lng?: number) => Promise<void>;
+}
+
+interface AddressListProps {
+  onAddressesChange?: (addresses: Address[]) => void;
+}
 
 interface AddressItemProps {
   address: Address;
@@ -68,9 +76,27 @@ interface AddressListProps {
   onAddressesChange?: (addresses: Address[]) => void;
 }
 
-export function AddressList({ onAddressesChange }: AddressListProps) {
+export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAddressesChange }, ref) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    addAddress: async (text: string, lat?: number, lng?: number) => {
+      const newAddress: Address = {
+        id: generateId(),
+        text,
+        lat,
+        lng,
+        status: lat && lng ? 'geocoded' : 'pending',
+        createdAt: Date.now(),
+      };
+
+      await addressStorage.add(newAddress);
+      const updated = [...addresses, newAddress];
+      setAddresses(updated);
+      onAddressesChange?.(updated);
+    },
+  }));
 
   // Load addresses from storage on mount
   useEffect(() => {
@@ -110,22 +136,6 @@ export function AddressList({ onAddressesChange }: AddressListProps) {
     onAddressesChange?.(newAddresses);
   };
 
-  const addAddress = async (text: string, lat?: number, lng?: number) => {
-    const newAddress: Address = {
-      id: generateId(),
-      text,
-      lat,
-      lng,
-      status: lat && lng ? 'geocoded' : 'pending',
-      createdAt: Date.now(),
-    };
-
-    await addressStorage.add(newAddress);
-    const updated = [...addresses, newAddress];
-    setAddresses(updated);
-    onAddressesChange?.(updated);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -159,4 +169,4 @@ export function AddressList({ onAddressesChange }: AddressListProps) {
       )}
     </div>
   );
-}
+});

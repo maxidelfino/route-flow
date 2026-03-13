@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMatrix, getRoute } from '@/lib/ors';
-import { optimizeAndCalculate, Point, Matrix } from '@/lib/tsp';
+import { getMatrix, getRoute, isApiKeyConfigured } from '@/lib/ors';
+import { optimizeAndCalculate, optimizeRouteLocal, Point, Matrix } from '@/lib/tsp';
 
 export interface OptimizeRequest {
   start: [number, number]; // [lng, lat]
@@ -48,9 +48,6 @@ export async function POST(request: NextRequest) {
       ...points.map(p => [p.lng, p.lat] as [number, number])
     ];
 
-    // Get matrix from ORS
-    const matrix = await getMatrix(coordinates);
-
     // Convert to TSP format
     const tspPoints: Point[] = points.map((p, i) => ({
       id: p.id,
@@ -58,22 +55,35 @@ export async function POST(request: NextRequest) {
       lng: p.lng,
     }));
 
-    // Optimize route (starting from point 0 which is our start)
-    const result = optimizeAndCalculate(tspPoints, 0, matrix, alpha, beta);
-
-    // Get detailed route for polyline
+    let result: ReturnType<typeof optimizeAndCalculate>;
     let polyline: number[][] | undefined;
     let steps: OptimizeResponse['steps'] | undefined;
 
-    try {
-      const routeCoords = result.route.map(i => coordinates[i]);
-      const routeResult = await getRoute(routeCoords);
-      polyline = routeResult.geometry.coordinates;
-      
-      // Flatten steps from all legs
-      steps = routeResult.legs.flatMap(leg => leg.steps);
-    } catch (routeError) {
-      console.warn('Could not get route details:', routeError);
+    // Check if ORS API key is available
+    if (isApiKeyConfigured()) {
+      try {
+        // Use ORS for optimized routing
+        const matrix = await getMatrix(coordinates);
+        result = optimizeAndCalculate(tspPoints, 0, matrix, alpha, beta);
+
+        // Get detailed route for polyline
+        try {
+          const routeCoords = result.route.map(i => coordinates[i]);
+          const routeResult = await getRoute(routeCoords);
+          polyline = routeResult.geometry.coordinates;
+          steps = routeResult.legs.flatMap(leg => leg.steps);
+        } catch (routeError) {
+          console.warn('Could not get route details:', routeError);
+        }
+      } catch (orsError) {
+        console.warn('ORS API failed, falling back to local optimization:', orsError);
+        // Fall through to local optimization
+        result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+      }
+    } else {
+      // Use local optimization with Haversine distances
+      console.log('Using local route optimization (no ORS API key)');
+      result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
     }
 
     // Map route indices back to point IDs

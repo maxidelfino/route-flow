@@ -5,6 +5,13 @@ interface ORSConfig {
 }
 
 /**
+ * Check if ORS API key is configured
+ */
+export function isApiKeyConfigured(): boolean {
+  return !!process.env.NEXT_PUBLIC_ORS_API_KEY;
+}
+
+/**
  * Get ORS API key from environment
  */
 function getApiKey(): string {

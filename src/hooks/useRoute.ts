@@ -154,6 +154,10 @@ export function useRoute() {
     }));
   }, []);
 
+  const getRemainingPoints = useCallback(() => {
+    return state.points.filter(p => p.status !== 'completed');
+  }, [state.points]);
+
   const completeCurrentPoint = useCallback(async () => {
     setState(prev => {
       const newPoints = [...prev.points];
@@ -179,7 +183,13 @@ export function useRoute() {
         status: isCompleted ? 'completed' : 'executing',
       };
     });
-  }, []);
+
+    // Recalculate route if there are remaining points
+    const remaining = getRemainingPoints();
+    if (remaining.length > 1) {
+      await calculateRoute();
+    }
+  }, [calculateRoute, getRemainingPoints]);
 
   const addPoint = useCallback((address: string, lat: number, lng: number) => {
     const newPoint: RoutePoint = {
@@ -208,6 +218,7 @@ export function useRoute() {
     calculateRoute,
     startExecution,
     completeCurrentPoint,
+    getRemainingPoints,
     addPoint,
     reset,
   };
