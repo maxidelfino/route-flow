@@ -33,12 +33,21 @@ npm run build
 
 ## Features
 
-- 📷 Carga de direcciones por foto (OCR)
-- 🗺️ Mapa con ruta optimizada
-- 📍 Tracking GPS en tiempo real
-- 🔄 Recálculo dinámico de rutas
-- 📱 PWA instalable
-- 🔌 Funciona offline
+| Feature | Estado | Notas |
+|---------|--------|-------|
+| 📷 Carga de direcciones por foto (OCR) | ✅ INDEPENDENT | Usa Tesseract.js |
+| 🗺️ Mapa con ruta optimizada | ✅ FALLBACK | ORS con Haversine fallback |
+| 📍 Tracking GPS en tiempo real | ✅ INDEPENDENT | Browser Geolocation API |
+| 🔄 Recálculo dinámico de rutas | ✅ FALLBACK | ORS con detección de desviación local |
+| 📱 PWA instalable | ✅ INDEPENDENT | Service Worker + Manifest |
+| 🔌 Funciona offline | ✅ INDEPENDENT | IndexedDB para datos |
+| 📊 Matriz de distancias | ✅ FALLBACK | ORS con Haversine fallback |
+| 🎯 Optimización de ruta (TSP) | ✅ FALLBACK | ORS con nearest-neighbor fallback |
+
+### Estados de Features
+- **INDEPENDENT**: Funciona sin API key externa
+- **FALLBACK**: Usa ORS API cuando está disponible, fallback local cuando no
+- **BLOCKED**: Requiere ORS API key (no implementado con fallback)
 
 ## Configuración
 
@@ -54,3 +63,5 @@ Obtener API key gratuita en [openrouteservice.org](https://openrouteservice.org)
 
 - [PRD](./docs/PRD.md) - Product Requirements
 - [RFC](./docs/RFC.md) - Technical Specification
+- [FEATURES](./docs/FEATURES.md) - Feature Matrix
+- [ORS_FALLBACK](./docs/ORS_FALLBACK.md) - Fallback System Documentation

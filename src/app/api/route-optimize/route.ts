@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMatrix, getRoute, isApiKeyConfigured } from '@/lib/ors';
+import { getMatrix, getRoute, isApiKeyConfigured, createStraightLinePolyline } from '@/lib/routing';
 import { optimizeAndCalculate, optimizeRouteLocal, Point, Matrix } from '@/lib/tsp';
 
 export interface OptimizeRequest {
@@ -20,6 +20,11 @@ export interface OptimizeResponse {
     duration: number;
     distance: number;
   }>;
+  _fallback?: {
+    used: boolean;
+    method?: string;
+    message?: string;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -58,6 +63,7 @@ export async function POST(request: NextRequest) {
     let result: ReturnType<typeof optimizeAndCalculate>;
     let polyline: number[][] | undefined;
     let steps: OptimizeResponse['steps'] | undefined;
+    let isFallback = false;
 
     // Check if ORS API key is available
     if (isApiKeyConfigured()) {
@@ -73,17 +79,26 @@ export async function POST(request: NextRequest) {
           polyline = routeResult.geometry.coordinates;
           steps = routeResult.legs.flatMap(leg => leg.steps);
         } catch (routeError) {
-          console.warn('Could not get route details:', routeError);
+          console.warn('Could not get route details, using straight line:', routeError);
+          // Use straight line as fallback
+          const lineResult = createStraightLinePolyline(coordinates);
+          polyline = lineResult.coordinates;
         }
       } catch (orsError) {
         console.warn('ORS API failed, falling back to local optimization:', orsError);
         // Fall through to local optimization
+        isFallback = true;
         result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+        const lineResult = createStraightLinePolyline(coordinates);
+        polyline = lineResult.coordinates;
       }
     } else {
       // Use local optimization with Haversine distances
       console.log('Using local route optimization (no ORS API key)');
+      isFallback = true;
       result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+      const lineResult = createStraightLinePolyline(coordinates);
+      polyline = lineResult.coordinates;
     }
 
     // Map route indices back to point IDs
@@ -99,6 +114,11 @@ export async function POST(request: NextRequest) {
       totalDistance: result.totalDistance,
       etas: result.etas,
       steps,
+      _fallback: isFallback ? {
+        used: true,
+        method: 'haversine',
+        message: 'ORS API Key no configurada - usando fallback local con Haversine',
+      } : undefined,
     };
 
     return NextResponse.json(response);
