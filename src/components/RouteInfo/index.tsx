@@ -96,13 +96,13 @@ export function RouteInfo({
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Tiempo estimado</p>
             <p className="text-lg font-semibold text-foreground">
-              {currentPoint.eta ? formatDuration(currentPoint.eta) : '--'}
+              {Number.isFinite(totalDuration) ? formatDuration(totalDuration) : '--'}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground">Distancia</p>
             <p className="text-lg font-semibold text-foreground">
-              {currentPoint.distance ? formatDistance(currentPoint.distance) : '--'}
+              {Number.isFinite(totalDistance) ? formatDistance(totalDistance) : '--'}
             </p>
           </div>
         </div>

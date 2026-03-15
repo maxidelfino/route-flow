@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMatrix, getRoute, isApiKeyConfigured, createStraightLinePolyline } from '@/lib/routing';
-import { optimizeAndCalculate, optimizeRouteLocal, Point, Matrix } from '@/lib/tsp';
+import { getDirections, decodePolyline, isGoogleMapsConfigured } from '@/lib/google-maps';
+import { optimizeAndCalculate, optimizeRouteLocal, Point } from '@/lib/tsp';
+import { createStraightLinePolyline } from '@/lib/routing/local';
 
 export interface OptimizeRequest {
   start: [number, number]; // [lng, lat]
@@ -24,6 +25,10 @@ export interface OptimizeResponse {
     used: boolean;
     method?: string;
     message?: string;
+  };
+  _googleMaps?: {
+    used: boolean;
+    optimized: boolean;
   };
 }
 
@@ -64,41 +69,99 @@ export async function POST(request: NextRequest) {
     let polyline: number[][] | undefined;
     let steps: OptimizeResponse['steps'] | undefined;
     let isFallback = false;
+    let googleMapsUsed = false;
+    let googleOptimized = false;
 
-    // Check if ORS API key is available
-    if (isApiKeyConfigured()) {
+    // Check if Google Maps API key is available (preferred)
+    if (isGoogleMapsConfigured()) {
       try {
-        // Use ORS for optimized routing
-        const matrix = await getMatrix(coordinates);
-        result = optimizeAndCalculate(tspPoints, 0, matrix, alpha, beta);
+        // Build waypoints from ALL delivery points
+        // For proper TSP optimization with round-trip, we use the START point as both
+        // origin AND destination (round trip), and pass all delivery points as waypoints
+        const waypoints = points.map(p => ({
+          location: [p.lat, p.lng] as [number, number], // [lat, lng] for Google
+          stopover: true,
+        }));
 
-        // Get detailed route for polyline
-        try {
-          const routeCoords = result.route.map(i => coordinates[i]);
-          const routeResult = await getRoute(routeCoords);
-          polyline = routeResult.geometry.coordinates;
-          steps = routeResult.legs.flatMap(leg => leg.steps);
-        } catch (routeError) {
-          console.warn('Could not get route details, using straight line:', routeError);
-          // Use straight line as fallback
-          const lineResult = createStraightLinePolyline(coordinates);
-          polyline = lineResult.coordinates;
+        // Use Google Directions API with optimizeWaypoints for TSP
+        // IMPORTANT: Use start point as BOTH origin and destination for round-trip optimization
+        // This ensures Google optimizes ALL waypoints in the optimal order
+        const directionsResponse = await getDirections(
+          [start[1], start[0]] as [number, number], // [lat, lng] for Google (start is [lng, lat])
+          [start[1], start[0]] as [number, number], // Same as origin for round trip
+          waypoints,
+          { optimize: true }
+        );
+
+        const route = directionsResponse.routes[0];
+        googleMapsUsed = true;
+        googleOptimized = true;
+
+        // Get optimized waypoint order from Google
+        const optimizedOrder = route.waypoint_order;
+        
+        // Map route indices back to point IDs using Google's order
+        const orderedIds: string[] = ['start'];
+        for (const idx of optimizedOrder) {
+          orderedIds.push(points[idx].id);
         }
-      } catch (orsError) {
-        console.warn('ORS API failed, falling back to local optimization:', orsError);
-        // Fall through to local optimization
-        isFallback = true;
-        result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
-        const lineResult = createStraightLinePolyline(coordinates);
-        polyline = lineResult.coordinates;
+
+        // Decode polyline from Google's encoded polyline
+        polyline = decodePolyline(route.overview_polyline.points);
+
+        // Calculate totals from legs
+        let totalDuration = 0;
+        let totalDistance = 0;
+        const etas: number[] = [];
+
+        for (const leg of route.legs) {
+          totalDuration += Math.round(leg.duration.value / 60); // seconds to minutes
+          totalDistance += leg.distance.value / 1000; // meters to km
+          etas.push(Math.round(leg.duration.value / 60));
+        }
+
+        // Parse steps for navigation instructions
+        steps = route.legs.flatMap((leg: { steps: Array<{ html_instructions: string; duration: { value: number }; distance: { value: number } }> }) => 
+          leg.steps.map(step => ({
+            instruction: step.html_instructions.replace(/<[^>]*>/g, ''), // Strip HTML
+            duration: Math.round(step.duration.value / 60),
+            distance: step.distance.value / 1000,
+          }))
+        );
+
+        // Create result in the format expected by the frontend
+        result = {
+          route: [0, ...optimizedOrder.map(i => i + 1)],
+          totalDuration,
+          totalDistance,
+          etas,
+        };
+
+        const response: OptimizeResponse = {
+          route: orderedIds,
+          polyline,
+          totalDuration: result.totalDuration,
+          totalDistance: result.totalDistance,
+          etas: result.etas,
+          steps,
+          _googleMaps: {
+            used: true,
+            optimized: googleOptimized,
+          },
+        };
+
+        return NextResponse.json(response);
+      } catch (googleError) {
+        console.warn('Google Maps API failed, falling back to local:', googleError);
+        // Fall through to local fallback
       }
-    } else {
-      // Use local optimization with Haversine distances
-      isFallback = true;
-      result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
-      const lineResult = createStraightLinePolyline(coordinates);
-      polyline = lineResult.coordinates;
     }
+
+    // Fallback to local optimization with Haversine distances
+    isFallback = true;
+    result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+    const lineResult = createStraightLinePolyline(coordinates);
+    polyline = lineResult.coordinates;
 
     // Map route indices back to point IDs
     const orderedIds = result.route.map(i => {
@@ -116,8 +179,12 @@ export async function POST(request: NextRequest) {
       _fallback: isFallback ? {
         used: true,
         method: 'haversine',
-        message: 'ORS API Key no configurada - usando fallback local con Haversine',
+        message: 'No routing service available - using fallback local with Haversine',
       } : undefined,
+      _googleMaps: {
+        used: false,
+        optimized: false,
+      },
     };
 
     return NextResponse.json(response);
@@ -126,7 +193,7 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof Error && error.message.includes('API key not configured')) {
       return NextResponse.json(
-        { error: 'ORS API key not configured. Please set NEXT_PUBLIC_ORS_API_KEY in .env.local' },
+        { error: 'No routing API key configured. Please set GOOGLE_MAPS_API_KEY in .env.local' },
         { status: 503 }
       );
     }

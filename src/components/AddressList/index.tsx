@@ -146,6 +146,7 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
         lng,
         status: lat && lng ? 'geocoded' : 'pending',
         createdAt: Date.now(),
+        order: addresses.length,
       };
 
       await addressStorage.add(newAddress);
@@ -161,8 +162,13 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
       setIsLoading(true);
       try {
         const stored = await addressStorage.getAll();
-        setAddresses(stored);
-        onAddressesChange?.(stored);
+        // Assign order if missing (for legacy data)
+        const withOrder = stored.map((addr, idx) => ({
+          ...addr,
+          order: addr.order ?? idx,
+        }));
+        setAddresses(withOrder);
+        onAddressesChange?.(withOrder);
       } catch (error) {
         console.error('Failed to load addresses:', error);
       } finally {
@@ -186,11 +192,14 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
       const oldIndex = addresses.findIndex((addr) => addr.id === active.id);
       const newIndex = addresses.findIndex((addr) => addr.id === over.id);
 
-      const newAddresses = arrayMove(addresses, oldIndex, newIndex);
+      const newAddresses = arrayMove(addresses, oldIndex, newIndex).map((addr, idx) => ({
+        ...addr,
+        order: idx,
+      }));
 
       // Update storage order
       for (const addr of newAddresses) {
-        await addressStorage.update(addr.id, addr);
+        await addressStorage.update(addr.id, { order: addr.order });
       }
 
       setAddresses(newAddresses);

@@ -1,3 +1,19 @@
+/**
+ * @deprecated This module is no longer the primary routing service.
+ * 
+ * Migration to Google Maps Platform (March 2026):
+ * - Directions: Now uses Google Directions API via `@/lib/google-maps/directions`
+ * - Geocoding: Now uses Google Geocoding API via `@/lib/google-maps/geocoding`
+ * - Distance Matrix: Now uses Google Distance Matrix API via `@/lib/google-maps/matrix`
+ * 
+ * This module remains as a FALLBACK only:
+ * - Used when Google Maps API key is not configured
+ * - Provides local Haversine-based calculations
+ * - Maintained for backward compatibility
+ * 
+ * To migrate: Ensure GOOGLE_MAPS_API_KEY is set in .env.local
+ * @see src/lib/google-maps/ for the new implementation
+ */
 const ORS_BASE_URL = 'https://api.openrouteservice.org';
 
 interface ORSConfig {
@@ -6,6 +22,8 @@ interface ORSConfig {
 
 /**
  * Check if ORS API key is configured
+ * @deprecated Use Google Maps API instead (GOOGLE_MAPS_API_KEY)
+ * @returns Whether ORS API key is set in environment
  */
 export function isApiKeyConfigured(): boolean {
   return !!process.env.NEXT_PUBLIC_ORS_API_KEY;
@@ -24,6 +42,7 @@ function getApiKey(): string {
 
 /**
  * Get time/distance matrix from ORS
+ * @deprecated Use Google Distance Matrix API via @/lib/google-maps/matrix
  * @param coordinates Array of [lng, lat] coordinates
  * @returns Matrix with durations (seconds) and distances (km)
  */
@@ -33,10 +52,9 @@ export async function getMatrix(coordinates: number[][]): Promise<{
 }> {
   const apiKey = getApiKey();
 
-  const response = await fetch(`${ORS_BASE_URL}/v2/matrix/driving-car`, {
+  const response = await fetch(`${ORS_BASE_URL}/v2/matrix/driving-car?api_key=${apiKey}`, {
     method: 'POST',
     headers: {
-      'Authorization': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -60,11 +78,75 @@ export async function getMatrix(coordinates: number[][]): Promise<{
 }
 
 /**
- * Get route directions between multiple points
- * @param coordinates Array of [lng, lat] coordinates
- * @returns Route with geometry and instructions
+ * Calculate distance between two points using Haversine formula
+ * @param coord1 [lng, lat]
+ * @param coord2 [lng, lat]
+ * @returns distance in meters
  */
+function haversineDistance(coord1: number[], coord2: number[]): number {
+  const R = 6371000; // Earth's radius in meters
+  const lat1 = (coord1[1] * Math.PI) / 180;
+  const lat2 = (coord2[1] * Math.PI) / 180;
+  const deltaLat = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+  const deltaLng = ((coord2[0] - coord1[0]) * Math.PI) / 180;
 
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+/**
+ * Calculate total route distance using Haversine formula
+ * @param coordinates Array of [lng, lat] coordinates
+ * @returns Total distance in meters
+ */
+export function calculateRouteDistance(coordinates: number[][]): number {
+  let totalDistance = 0;
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    totalDistance += haversineDistance(coordinates[i], coordinates[i + 1]);
+  }
+  return totalDistance;
+}
+
+/**
+ * Get route directions between multiple points using Haversine fallback
+ * @param coordinates Array of [lng, lat] coordinates
+ * @returns Fallback route with straight-line geometry
+ */
+export function getRouteFallback(coordinates: number[][]): RouteResult {
+  const totalDistance = calculateRouteDistance(coordinates);
+  // Estimate duration: assume average speed of 40 km/h in city
+  const estimatedDuration = (totalDistance / 1000) * 3.6 * 3600; // seconds
+
+  return {
+    geometry: {
+      coordinates,
+      type: 'LineString',
+    },
+    duration: estimatedDuration,
+    distance: totalDistance,
+    legs: [
+      {
+        duration: estimatedDuration,
+        distance: totalDistance,
+        steps: [
+          {
+            instruction: 'Seguir ruta',
+            duration: estimatedDuration,
+            distance: totalDistance,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * ORS API types
+ */
 export interface ORSStep {
   instruction: string;
   duration: number;
@@ -95,26 +177,45 @@ export interface RouteResult {
   }>;
 }
 
-export async function getRoute(coordinates: number[][]): Promise<RouteResult> {
+/**
+ * Get route directions between multiple points
+ * @deprecated Use Google Directions API via @/lib/google-maps/directions
+ * @param coordinates Array of [lng, lat] coordinates
+ * @param useFallback If true, skip API call and use Haversine fallback
+ * @returns Route with geometry and instructions
+ */
+
+export async function getRoute(coordinates: number[][], useFallback = false): Promise<RouteResult> {
   const apiKey = getApiKey();
 
+  // If fallback is requested, skip API call
+  if (useFallback) {
+    console.log('[ORS] Using Haversine fallback for route calculation');
+    return getRouteFallback(coordinates);
+  }
+
   // ORS expects [lng, lat] format
-  const response = await fetch(`${ORS_BASE_URL}/v2/directions/driving-car`, {
+  const response = await fetch(`${ORS_BASE_URL}/v2/directions/driving-car?api_key=${apiKey}`, {
     method: 'POST',
     headers: {
-      'Authorization': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       coordinates,
       format: 'geojson',
       instructions: true,
-      instructions_type: 'text',
     }),
   });
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('[ORS] API Error:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: error,
+      endpoint: `${ORS_BASE_URL}/v2/directions/driving-car`,
+      coordinatesCount: coordinates.length,
+    });
     throw new Error(`ORS Directions API error: ${response.status} - ${error}`);
   }
 

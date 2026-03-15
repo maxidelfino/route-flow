@@ -8,6 +8,7 @@ export interface Address {
   lng?: number;
   status: 'pending' | 'geocoding' | 'geocoded' | 'completed';
   createdAt: number;
+  order?: number;
 }
 
 export interface RouteSettings {
@@ -68,7 +69,8 @@ function getDB() {
 export const addressStorage = {
   async getAll(): Promise<Address[]> {
     const db = await getDB();
-    return db.getAll('addresses');
+    const addresses = await db.getAll('addresses');
+    return addresses.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   },
 
   async getById(id: string): Promise<Address | undefined> {

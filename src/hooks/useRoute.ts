@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Address, addressStorage } from '@/lib/storage';
+import { addressStorage } from '@/lib/storage';
 
 export type RouteStatus = 'idle' | 'loading' | 'ready' | 'executing' | 'completed';
 
@@ -20,6 +20,7 @@ export interface RouteState {
   startPoint: { lat: number; lng: number; address?: string } | null;
   points: RoutePoint[];
   route: string[]; // ordered point IDs
+  polyline: [number, number][] | null; // real route from ORS
   totalDuration: number;
   totalDistance: number;
   currentIndex: number;
@@ -31,6 +32,7 @@ const initialState: RouteState = {
   startPoint: null,
   points: [],
   route: [],
+  polyline: null,
   totalDuration: 0,
   totalDistance: 0,
   currentIndex: 0,
@@ -80,13 +82,23 @@ export function useRoute() {
     }
   }, []);
 
-  const calculateRoute = useCallback(async () => {
-    if (!state.startPoint || state.points.length === 0) {
+  const calculateRoute = useCallback(async (fromPosition?: { lat: number; lng: number }) => {
+    const startPoint = fromPosition || state.startPoint;
+    
+    if (!startPoint) {
       setState(prev => ({
         ...prev,
         error: 'No start point or addresses defined',
       }));
-      return;
+      return null;
+    }
+
+    if (state.points.length === 0) {
+      setState(prev => ({
+        ...prev,
+        error: 'No addresses defined',
+      }));
+      return null;
     }
 
     setState(prev => ({ ...prev, status: 'loading', error: null }));
@@ -96,7 +108,7 @@ export function useRoute() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start: [state.startPoint.lng, state.startPoint.lat],
+          start: [startPoint.lng, startPoint.lat],
           points: state.points.map(p => ({
             id: p.id,
             lat: p.lat,
@@ -112,14 +124,13 @@ export function useRoute() {
 
       const result = await response.json();
 
-      // Reorder points based on optimized route indices
-      // result.route contains indices: [0, 2, 1, 3] where 0 is start
-      // We need to map these to points (subtract 1 to skip start point)
+      // Reorder points based on optimized route IDs
+      // result.route contains point IDs: ["start", "point-id-1", "point-id-2", ...]
+      const pointIdMap = new Map(state.points.map(p => [p.id, p]));
       const reorderedPoints: RoutePoint[] = result.route
-        .slice(1) // Skip index 0 (start point)
-        .map((routeIndex: number): RoutePoint | undefined => {
-          const pointIndex = routeIndex - 1;
-          return state.points[pointIndex];
+        .slice(1) // Skip 'start' (first item)
+        .map((pointId: string): RoutePoint | undefined => {
+          return pointIdMap.get(pointId);
         })
         .filter((p: RoutePoint | undefined): p is RoutePoint => p !== undefined);
 
@@ -134,6 +145,7 @@ export function useRoute() {
         ...prev,
         status: 'ready',
         route: result.route,
+        polyline: result.polyline as [number, number][] | null,
         points: updatedPoints,
         totalDuration: result.totalDuration,
         totalDistance: result.totalDistance,
@@ -169,7 +181,7 @@ export function useRoute() {
     return state.points.filter(p => p.status !== 'completed');
   }, [state.points]);
 
-  const completeCurrentPoint = useCallback(async () => {
+  const completeCurrentPoint = useCallback(async (fromPosition?: { lat: number; lng: number }) => {
     setState(prev => {
       const newPoints = [...prev.points];
       newPoints[prev.currentIndex] = {
@@ -194,13 +206,7 @@ export function useRoute() {
         status: isCompleted ? 'completed' : 'executing',
       };
     });
-
-    // Recalculate route if there are remaining points
-    const remaining = getRemainingPoints();
-    if (remaining.length > 1) {
-      await calculateRoute();
-    }
-  }, [calculateRoute, getRemainingPoints]);
+  }, []);
 
   const addPoint = useCallback((address: string, lat: number, lng: number) => {
     const newPoint: RoutePoint = {

@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorToast } from '@/components/ErrorToast';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { RouteSummary } from '@/components/RouteSummary';
+import { Address } from '@/lib/storage';
 
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
@@ -37,9 +38,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const addressListRef = useRef<AddressListRef>(null);
+  const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
 
-  const handleAddressesChange = useCallback(() => {
-    loadAddresses();
+  const handleAddressesChange = useCallback(async (_addresses: Address[]) => {
+    await loadAddresses();
   }, [loadAddresses]);
 
   // Build markers array: start point first, then delivery points
@@ -62,18 +64,39 @@ export default function Home() {
     })),
   ];
 
-  // Build route coordinates from startPoint + points in order (straight lines)
-  const routeCoords: [number, number][] = [];
-  
-  // Add start point first if exists
-  if (state.startPoint) {
-    routeCoords.push([state.startPoint.lng, state.startPoint.lat]);
-  }
-  
-  // Add each point in order
-  state.points.forEach(p => {
-    routeCoords.push([p.lng, p.lat]);
+  // Build route coordinates from polyline
+  // Google Directions returns [lat, lng] (Leaflet expects this)
+  // ORS and Haversine fallback return [lng, lat] (GeoJSON format - needs conversion)
+  // Detect format by checking if first value is a valid latitude (-90 to 90)
+  // AND second value is a valid longitude (-180 to 180)
+  const routeCoords: [number, number][] = (state.polyline || []).map((coord) => {
+    const [a, b] = coord;
+    // Check if coordinates are in GeoJSON [lng, lat] format:
+    // - Latitude must be between -90 and 90
+    // - Longitude must be between -180 and 180
+    // If first value could be longitude (>90 or <-90) AND second could be latitude (|val| <= 90)
+    // Then it's [lng, lat] and needs conversion
+    const aCouldBeLat = a >= -90 && a <= 90;
+    const bCouldBeLat = b >= -90 && b <= 90;
+    const aCouldBeLng = b >= -180 && b <= 180;
+    
+    if (!aCouldBeLat && aCouldBeLng && bCouldBeLat) {
+      // Format is [lng, lat] - convert to [lat, lng] for Leaflet
+      return [b, a] as [number, number];
+    }
+    // Already [lat, lng] format from Google
+    return coord as [number, number];
   });
+  
+  // Fallback: build straight line route if no polyline available
+  if (routeCoords.length === 0) {
+    if (state.startPoint) {
+      routeCoords.push([state.startPoint.lat, state.startPoint.lng]);
+    }
+    state.points.forEach(p => {
+      routeCoords.push([p.lat, p.lng]);
+    });
+  }
 
   const mapCenter = state.startPoint 
     ? [state.startPoint.lat, state.startPoint.lng] as [number, number]
@@ -85,6 +108,11 @@ export default function Home() {
     try {
       await addressListRef.current?.addAddress(address, lat, lng);
       await loadAddresses();
+      
+      // Auto-recalculate if: has startPoint AND has addresses AND not executing
+      if (state.startPoint && state.points.length > 0 && state.status !== 'executing') {
+        await calculateRoute();
+      }
     } catch {
       setError('Error al agregar dirección');
     }
@@ -127,7 +155,7 @@ export default function Home() {
   };
 
   const handleComplete = async () => {
-    await completeCurrentPoint();
+    await completeCurrentPoint(currentPosition || undefined);
   };
 
   const handleRetry = async () => {
@@ -135,10 +163,13 @@ export default function Home() {
     
     setIsRetrying(true);
     try {
-      await loadAddresses();
       setError(null);
+      const result = await calculateRoute();
+      if (!result) {
+        setError(state.error || 'Error al calcular ruta');
+      }
     } catch {
-      // Error will be set by loadAddresses
+      setError(state.error || 'Error al calcular ruta');
     } finally {
       setIsRetrying(false);
     }
@@ -165,12 +196,13 @@ export default function Home() {
       {!isOnline && <OfflineBanner />}
       
       {/* Map Section */}
-      <div className={`${isMobile ? 'h-[40vh]' : 'flex-1'} relative`}>
+      <div className={`${isMobile ? 'h-[40vh]' : 'flex-1'} relative z-10`}>
         <Map
           center={mapCenter}
           zoom={14}
           markers={markers}
           route={routeCoords}
+          currentPosition={currentPosition}
         />
         
         {/* StartPointSelector overlay - desktop only */}
@@ -304,6 +336,10 @@ export default function Home() {
                 onComplete={handleComplete}
                 onCancel={handleCancel}
                 onAddStop={() => setActiveTab('addresses')}
+                route={routeCoords}
+                onPositionUpdate={setCurrentPosition}
+                onRecalculate={handleCalculateRoute}
+                nextPoint={state.points[state.currentIndex + 1] || null}
               />
             </div>
           )}

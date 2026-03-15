@@ -1,0 +1,42 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic:
+          - generic [ref=e5]:
+            - button "Zoom in" [ref=e6] [cursor=pointer]: +
+            - button "Zoom out" [ref=e7] [cursor=pointer]: −
+          - generic [ref=e8]:
+            - link "Leaflet" [ref=e9] [cursor=pointer]:
+              - /url: https://leafletjs.com
+              - img [ref=e10]
+              - text: Leaflet
+            - text: "| ©"
+            - link "OpenStreetMap" [ref=e14] [cursor=pointer]:
+              - /url: https://www.openstreetmap.org/copyright
+            - text: contributors
+      - button "Punto de inicio" [ref=e17]:
+        - img [ref=e18]
+        - text: Punto de inicio
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - heading "Agregar Direcciones" [level=2] [ref=e24]
+        - textbox "Buscar dirección..." [ref=e27]
+        - generic [ref=e29]:
+          - img [ref=e30]
+          - paragraph [ref=e33]: No hay direcciones cargadas
+          - paragraph [ref=e34]: Agrega una dirección manualmente o con OCR
+      - generic [ref=e35]:
+        - heading "OCR" [level=2] [ref=e36]
+        - generic [ref=e38]:
+          - button "Tomar foto / Elegir imagen" [ref=e39] [cursor=pointer]:
+            - img [ref=e40]
+            - text: Tomar foto / Elegir imagen
+          - paragraph [ref=e43]: Saca una foto de la dirección en la planilla
+  - button "Open Next.js Dev Tools" [ref=e49] [cursor=pointer]:
+    - img [ref=e50]
+  - alert [ref=e53]
+```

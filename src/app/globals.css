@@ -234,3 +234,14 @@ body {
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Ensure Leaflet zoom controls are always clickable and above other elements */
+.leaflet-control-zoom {
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+}
+
+.leaflet-control-container .leaflet-top,
+.leaflet-control-container .leaflet-bottom {
+  z-index: 999 !important;
+}

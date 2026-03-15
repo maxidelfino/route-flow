@@ -1,35 +1,79 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AddressInput } from '@/components/AddressInput';
+import { reverseGeocode } from '@/lib/geocode';
 
 export interface StartPointSelectorProps {
   onStartPointSelect: (lat: number, lng: number, address?: string) => void;
   initialPoint?: { lat: number; lng: number; address?: string };
+  isOpen?: boolean; // Optional external control for modal state
 }
 
-export function StartPointSelector({ onStartPointSelect, initialPoint }: StartPointSelectorProps) {
+export function StartPointSelector({ onStartPointSelect, initialPoint, isOpen }: StartPointSelectorProps) {
   const [showSelector, setShowSelector] = useState(false);
+
+  // Sync internal state with isOpen prop when provided
+  useEffect(() => {
+    if (isOpen !== undefined) {
+      setShowSelector(isOpen);
+    }
+  }, [isOpen]);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [manualLat, setManualLat] = useState('');
   const [manualLng, setManualLng] = useState('');
   const [manualError, setManualError] = useState<string | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'gps' | 'search' | 'manual'>('gps');
 
-  const handleUseCurrentLocation = () => {
+  // Simplify full Nominatim address to just street + number
+  // e.g., "Calle Corrientes 1234, Buenos Aires, Argentina" -> "Corrientes 1234"
+  const simplifyAddress = (fullAddress: string): string => {
+    if (!fullAddress) return 'Ubicación actual';
+    
+    // Split by comma and try to get the first meaningful part
+    const parts = fullAddress.split(',').map(p => p.trim()).filter(p => p.length > 0);
+    
+    if (parts.length === 0) return 'Ubicación actual';
+    
+    // Usually the street + number is the first part for Nominatim
+    // But sometimes it starts with house number, so check for that
+    const firstPart = parts[0];
+    
+    // If first part is just a number (house number), combine with second part
+    if (/^\d+$/.test(firstPart) && parts[1]) {
+      return `${parts[1]}, ${firstPart}`;
+    }
+    
+    return firstPart;
+  };
+
+  const handleUseCurrentLocation = async () => {
     setGpsError(null);
+    setIsLoadingAddress(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          onStartPointSelect(
-            position.coords.latitude,
-            position.coords.longitude,
-            'Ubicación actual'
-          );
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          
+          // Try to reverse geocode the coordinates to get actual address
+          let address = 'Ubicación actual';
+          try {
+            const reverseAddress = await reverseGeocode(lat, lng);
+            // Simplify the address (just street + number if possible)
+            address = simplifyAddress(reverseAddress);
+          } catch (error) {
+            console.warn('Reverse geocoding failed, using fallback:', error);
+          }
+          
+          onStartPointSelect(lat, lng, address);
           setShowSelector(false);
+          setIsLoadingAddress(false);
         },
         (error) => {
+          setIsLoadingAddress(false);
           switch (error.code) {
             case error.PERMISSION_DENIED:
               setGpsError('Permiso de ubicación denegado. Por favor habilita el acceso a tu ubicación en la configuración del navegador.');
@@ -80,17 +124,27 @@ export function StartPointSelector({ onStartPointSelect, initialPoint }: StartPo
     return true;
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (validateManualInput()) {
-      onStartPointSelect(
-        parseFloat(manualLat),
-        parseFloat(manualLng),
-        'Coordenadas manuales'
-      );
+      setIsLoadingAddress(true);
+      const lat = parseFloat(manualLat);
+      const lng = parseFloat(manualLng);
+      
+      // Try to reverse geocode the coordinates to get actual address
+      let address = 'Coordenadas manuales';
+      try {
+        const reverseAddress = await reverseGeocode(lat, lng);
+        address = simplifyAddress(reverseAddress);
+      } catch (error) {
+        console.warn('Reverse geocoding failed, using fallback:', error);
+      }
+      
+      onStartPointSelect(lat, lng, address);
       setManualLat('');
       setManualLng('');
       setShowSelector(false);
       setShowManualInput(false);
+      setIsLoadingAddress(false);
     }
   };
 
@@ -109,10 +163,22 @@ export function StartPointSelector({ onStartPointSelect, initialPoint }: StartPo
     setActiveTab('gps');
   };
 
+  const handleButtonClick = () => {
+    if (isOpen !== undefined) {
+      // If isOpen is controlled externally, toggle via prop
+      // The parent controls the state - we just need to notify it
+      // For now, we keep internal state in sync
+      setShowSelector(!showSelector);
+    } else {
+      // Fallback to internal toggle if no external control
+      setShowSelector(!showSelector);
+    }
+  };
+
   return (
     <div className="relative">
       <button
-        onClick={() => setShowSelector(!showSelector)}
+        onClick={handleButtonClick}
         className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors text-sm"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,16 +229,28 @@ export function StartPointSelector({ onStartPointSelect, initialPoint }: StartPo
             <div className="space-y-3">
               <button
                 onClick={handleUseCurrentLocation}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+                disabled={isLoadingAddress}
               >
                 <div className="w-8 h-8 bg-success-light rounded-full flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  {isLoadingAddress ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Ubicación actual</p>
-                  <p className="text-xs text-muted-foreground">Usar GPS</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {isLoadingAddress ? 'Obteniendo dirección...' : 'Ubicación actual'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isLoadingAddress ? 'Revirtiendo coordenadas' : 'Usar GPS'}
+                  </p>
                 </div>
               </button>
 
@@ -238,9 +316,10 @@ export function StartPointSelector({ onStartPointSelect, initialPoint }: StartPo
 
               <button
                 onClick={handleManualSubmit}
-                className="w-full px-4 py-2 min-h-[44px] bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-colors"
+                disabled={isLoadingAddress}
+                className="w-full px-4 py-2 min-h-[44px] bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50"
               >
-                Confirmar
+                {isLoadingAddress ? 'Obteniendo dirección...' : 'Confirmar'}
               </button>
             </div>
           )}

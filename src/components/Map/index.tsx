@@ -1,9 +1,8 @@
+/// <reference types="google.maps" />
 'use client';
 
-import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useState, useMemo } from 'react';
+import { APIProvider, Map, useMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 
 // Types
 export interface MapMarker {
@@ -18,97 +17,232 @@ export interface MapProps {
   center?: [number, number];
   zoom?: number;
   markers?: MapMarker[];
-  route?: [number, number][];
+  route?: [number, number][]; // Not used anymore - DirectionsRenderer handles it
+  currentPosition?: { lat: number; lng: number } | null;
   onMarkerClick?: (id: string) => void;
 }
 
-// Dynamic import to avoid SSR issues with Leaflet
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
+// Config
+const ROSARIO_CENTER = { lat: -32.9468, lng: -60.6393 };
+const MAP_ID = 'route-flow-map';
 
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
+interface DirectionsRendererProps {
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  waypoints: Array<{ lat: number; lng: number }>;
+}
 
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
+function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRendererProps) {
+  const map = useMap();
+  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
+  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
 
-const Polyline = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Polyline),
-  { ssr: false }
-);
+  useEffect(() => {
+    if (!map) return;
 
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
-);
+    // Create service and renderer
+    const service = new google.maps.DirectionsService();
+    const renderer = new google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true, // We handle our own markers
+      preserveViewport: false,
+      polylineOptions: {
+        strokeColor: '#3b82f6',
+        strokeWeight: 4,
+        strokeOpacity: 0.8,
+      },
+    });
 
-// Custom marker colors based on status
-const getMarkerColor = (status?: string) => {
-  switch (status) {
-    case 'completed':
-      return '#22c55e'; // green
-    case 'active':
-      return '#f59e0b'; // amber
-    case 'start':
-      return '#10b981'; // emerald - distinct color for start point
-    default:
-      return '#3b82f6'; // blue
-  }
-};
+    setDirectionsService(service);
+    setDirectionsRenderer(renderer);
 
-// Create custom DivIcon with colored background and number
-const createCustomIcon = (color: string, index: number, _label?: string) => {
-  return L.divIcon({
-    className: 'custom-marker',
-    html: `
-      <div style="
-        background-color: ${color};
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 14px;
-        border: 3px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      ">${index + 1}</div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
-  });
-};
+    return () => {
+      renderer.setMap(null);
+    };
+  }, [map]);
 
-export default function MapComponent({
-  center = [-34.6037, -58.3816], // Buenos Aires default
-  zoom = 12,
+  useEffect(() => {
+    if (!directionsService || !directionsRenderer || !origin || !destination) return;
+
+    const request: google.maps.DirectionsRequest = {
+      origin: new google.maps.LatLng(origin.lat, origin.lng),
+      destination: new google.maps.LatLng(destination.lat, destination.lng),
+      waypoints: waypoints.map(wp => ({
+        location: new google.maps.LatLng(wp.lat, wp.lng),
+        stopover: true,
+      })),
+      optimizeWaypoints: false, // Already optimized by backend
+      travelMode: google.maps.TravelMode.DRIVING,
+    };
+
+    directionsService.route(request, (result, status) => {
+      if (status === 'OK' && result) {
+        directionsRenderer.setDirections(result);
+      } else {
+        console.error('Directions API error:', status);
+      }
+    });
+  }, [directionsService, directionsRenderer, origin, destination, waypoints]);
+
+  return null;
+}
+
+// Custom marker component using AdvancedMarker
+function CustomMarker({ 
+  marker, 
+  index, 
+  onClick 
+}: { 
+  marker: MapMarker; 
+  index: number; 
+  onClick?: () => void 
+}) {
+  const color = useMemo(() => {
+    switch (marker.status) {
+      case 'completed':
+        return '#22c55e'; // green
+      case 'active':
+        return '#f59e0b'; // amber
+      case 'start':
+        return '#10b981'; // emerald
+      default:
+        return '#3b82f6'; // blue
+    }
+  }, [marker.status]);
+
+  // Start point displays as 0, delivery points start at 1
+  // index passed is based on markers array order: [startPoint, point0, point1, ...]
+  const displayNumber = marker.status === 'start' ? 0 : index;
+
+  return (
+    <AdvancedMarker
+      position={{ lat: marker.lat, lng: marker.lng }}
+      onClick={onClick}
+    >
+      <div
+        style={{
+          backgroundColor: color,
+          width: '32px',
+          height: '32px',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          border: '3px solid white',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          cursor: 'pointer',
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
+        {displayNumber}
+      </div>
+    </AdvancedMarker>
+  );
+}
+
+// Current position marker
+function CurrentPositionMarker({ position }: { position: { lat: number; lng: number } }) {
+  return (
+    <AdvancedMarker position={position}>
+      <div
+        style={{
+          width: '24px',
+          height: '24px',
+          borderRadius: '50%',
+          backgroundColor: '#0ea5e9',
+          border: '3px solid white',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+        }}
+      />
+    </AdvancedMarker>
+  );
+}
+
+// Main map container
+function MapContent({
+  center,
+  zoom = 14,
   markers = [],
-  route = [],
+  currentPosition,
   onMarkerClick,
 }: MapProps) {
+  // Determine route origin and destination for DirectionsRenderer
+  // Markers array: [startPoint?, point0, point1, point2, ...]
+  const routeInfo = useMemo(() => {
+    if (markers.length < 2) return null;
+
+    // Find start marker (status='start') or use first marker
+    const startMarker = markers.find(m => m.status === 'start') || markers[0];
+    
+    // Find the last marker (destination)
+    const lastMarker = markers[markers.length - 1];
+    
+    // All markers between start and end are waypoints
+    const waypointMarkers = markers.slice(1, -1);
+
+    if (!lastMarker || startMarker.id === lastMarker.id) return null;
+
+    return {
+      origin: { lat: startMarker.lat, lng: startMarker.lng },
+      destination: { lat: lastMarker.lat, lng: lastMarker.lng },
+      waypoints: waypointMarkers.map(m => ({ lat: m.lat, lng: m.lng })),
+    };
+  }, [markers]);
+
+  const mapCenter = center 
+    ? { lat: center[0], lng: center[1] } 
+    : ROSARIO_CENTER;
+
+  return (
+    <Map
+      mapId={MAP_ID}
+      defaultCenter={mapCenter}
+      defaultZoom={zoom}
+      style={{ height: '100%', width: '100%' }}
+      gestureHandling="greedy"
+      disableDefaultUI={false}
+      zoomControl={true}
+      mapTypeControl={false}
+      streetViewControl={false}
+      fullscreenControl={true}
+    >
+      {/* Directions route */}
+      {routeInfo && (
+        <DirectionsRenderer
+          origin={routeInfo.origin}
+          destination={routeInfo.destination}
+          waypoints={routeInfo.waypoints}
+        />
+      )}
+
+      {/* Markers */}
+      {markers.map((marker, index) => (
+        <CustomMarker
+          key={marker.id}
+          marker={marker}
+          index={index}
+          onClick={() => onMarkerClick?.(marker.id)}
+        />
+      ))}
+
+      {/* Current position */}
+      {currentPosition && (
+        <CurrentPositionMarker position={currentPosition} />
+      )}
+    </Map>
+  );
+}
+
+// Export the main component with APIProvider wrapper
+export default function MapComponent(props: MapProps) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    
-    // Fix Leaflet default icon issue
-    import('leaflet').then((L) => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      });
-    });
   }, []);
 
   if (!isMounted) {
@@ -119,55 +253,20 @@ export default function MapComponent({
     );
   }
 
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full bg-muted flex items-center justify-center">
+        <span className="text-muted-foreground text-center p-4">
+          API de Google Maps no configurada.<br />
+          Configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en .env.local
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      style={{ height: '100%', width: '100%' }}
-      className="z-0"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      
-      {/* Route polyline */}
-      {route.length > 1 && (
-        <Polyline
-          positions={route}
-          pathOptions={{
-            color: '#3b82f6',
-            weight: 4,
-            opacity: 0.8,
-          }}
-        />
-      )}
-      
-      {/* Markers with custom colored icons */}
-      {markers.map((marker, index) => {
-        const color = getMarkerColor(marker.status);
-        // For start markers, always show "0", otherwise use the index
-        const displayIndex = marker.status === 'start' ? 0 : index;
-        const icon = createCustomIcon(color, displayIndex, marker.label);
-        
-        return (
-          <Marker
-            key={marker.id}
-            position={[marker.lat, marker.lng]}
-            icon={icon}
-            eventHandlers={{
-              click: () => onMarkerClick?.(marker.id),
-            }}
-          >
-            <Popup>
-              <div className="text-sm">
-                <p className="font-semibold">{marker.label || marker.id}</p>
-                <p className="text-xs text-muted-foreground capitalize">{marker.status === 'start' ? 'Punto de inicio' : marker.status || 'pendiente'}</p>
-              </div>
-            </Popup>
-          </Marker>
-        );
-      })}
-    </MapContainer>
+    <APIProvider apiKey={apiKey} solutionChannel="GMP_DevRel_creativersions_2025_03">
+      <MapContent {...props} />
+    </APIProvider>
   );
 }

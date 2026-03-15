@@ -105,13 +105,14 @@ export function nearestNeighbor(
 /**
  * 2-opt local search improvement
  * Swaps pairs of edges to reduce total cost
+ * Fixed: includes segment from start (i=0)
  */
 export function twoOpt(
   route: number[],
   matrix: Matrix,
   alpha = DEFAULT_ALPHA,
   beta = DEFAULT_BETA,
-  maxIterations = 100
+  maxIterations = 500
 ): number[] {
   let improved = true;
   let bestRoute = [...route];
@@ -121,12 +122,12 @@ export function twoOpt(
     improved = false;
     iterations++;
 
-    for (let i = 1; i < bestRoute.length - 1; i++) {
-      for (let j = i + 1; j < bestRoute.length; j++) {
+    for (let i = 0; i < bestRoute.length - 1; i++) {
+      for (let j = i + 2; j < bestRoute.length; j++) {
         // Create new route by reversing segment between i and j
         const newRoute = [
-          ...bestRoute.slice(0, i),
-          ...bestRoute.slice(i, j + 1).reverse(),
+          ...bestRoute.slice(0, i + 1),
+          ...bestRoute.slice(i + 1, j + 1).reverse(),
           ...bestRoute.slice(j + 1),
         ];
 
@@ -143,6 +144,7 @@ export function twoOpt(
 
 /**
  * Main optimization function: Nearest Neighbor + 2-opt
+ * Tests multiple starting points for better results
  */
 export function optimizeRoute(
   points: Point[],
@@ -151,11 +153,49 @@ export function optimizeRoute(
   alpha = DEFAULT_ALPHA,
   beta = DEFAULT_BETA
 ): number[] {
-  // Phase 1: Get initial route with Nearest Neighbor
-  const nnRoute = nearestNeighbor(points, startIndex, matrix, alpha, beta);
+  // Phase 1: Try Nearest Neighbor from multiple starting points
+  // This helps escape local minima that depend on initial selection
+  let bestRoute: number[] | null = null;
+  let bestCost = Infinity;
+
+  const startPointsToTry = points.length <= 10 
+    ? points.map((_, i) => i)  // Try all points as start if small
+    : [startIndex, ...Array.from({ length: Math.min(3, points.length) }, () => Math.floor(Math.random() * points.length))];
+
+  for (const sp of startPointsToTry) {
+    const nnRoute = nearestNeighbor(points, sp, matrix, alpha, beta);
+    const cost = routeCost(nnRoute, matrix, alpha, beta);
+    
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestRoute = nnRoute;
+    }
+  }
+
+  if (!bestRoute) {
+    bestRoute = nearestNeighbor(points, startIndex, matrix, alpha, beta);
+  }
 
   // Phase 2: Improve with 2-opt
-  const optimizedRoute = twoOpt(nnRoute, matrix, alpha, beta);
+  const optimizedRoute = twoOpt(bestRoute, matrix, alpha, beta);
+
+  // Phase 3: Try 2-opt from other starting points to escape local optima
+  // Only for small instances where it's worth the extra computation
+  if (points.length <= 15) {
+    const finalCost = routeCost(optimizedRoute, matrix, alpha, beta);
+    
+    for (let i = 0; i < points.length; i++) {
+      if (i === startIndex) continue;
+      
+      const altRoute = nearestNeighbor(points, i, matrix, alpha, beta);
+      const altOptimized = twoOpt(altRoute, matrix, alpha, beta);
+      const altCost = routeCost(altOptimized, matrix, alpha, beta);
+      
+      if (altCost < finalCost) {
+        return altOptimized;
+      }
+    }
+  }
 
   return optimizedRoute;
 }
