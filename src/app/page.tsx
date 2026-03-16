@@ -65,26 +65,15 @@ export default function Home() {
   ];
 
   // Build route coordinates from polyline
-  // Google Directions returns [lat, lng] (Leaflet expects this)
-  // ORS and Haversine fallback return [lng, lat] (GeoJSON format - needs conversion)
-  // Detect format by checking if first value is a valid latitude (-90 to 90)
-  // AND second value is a valid longitude (-180 to 180)
   const routeCoords: [number, number][] = (state.polyline || []).map((coord) => {
     const [a, b] = coord;
-    // Check if coordinates are in GeoJSON [lng, lat] format:
-    // - Latitude must be between -90 and 90
-    // - Longitude must be between -180 and 180
-    // If first value could be longitude (>90 or <-90) AND second could be latitude (|val| <= 90)
-    // Then it's [lng, lat] and needs conversion
     const aCouldBeLat = a >= -90 && a <= 90;
     const bCouldBeLat = b >= -90 && b <= 90;
     const aCouldBeLng = b >= -180 && b <= 180;
     
     if (!aCouldBeLat && aCouldBeLng && bCouldBeLat) {
-      // Format is [lng, lat] - convert to [lat, lng] for Leaflet
       return [b, a] as [number, number];
     }
-    // Already [lat, lng] format from Google
     return coord as [number, number];
   });
   
@@ -109,7 +98,6 @@ export default function Home() {
       await addressListRef.current?.addAddress(address, lat, lng);
       await loadAddresses();
       
-      // Auto-recalculate if: has startPoint AND has addresses AND not executing
       if (state.startPoint && state.points.length > 0 && state.status !== 'executing') {
         await calculateRoute();
       }
@@ -118,28 +106,47 @@ export default function Home() {
     }
   };
 
-  const handleOCRTextExtracted = async (text: string) => {
+  const handleOCRTextExtracted = async (text: string, lat?: number, lng?: number) => {
     const lines = text.split('\n').filter(line => line.trim());
-    for (const line of lines) {
+    
+    // Add each address from OCR text
+    for (let i = 0; i < lines.length; i++) {
+      const trimmedLine = lines[i].trim();
+      if (!trimmedLine) continue;
+      
+      // Use coordinates only for the first line (validated address)
+      // For subsequent lines, coordinates need to be looked up separately
+      const useCoords = i === 0 ? { lat, lng } : { lat: undefined, lng: undefined };
+      
       try {
-        await addressListRef.current?.addAddress(line.trim());
-      } catch {
-        console.error('Error adding OCR address');
+        if (!addressListRef.current) {
+          setError('Error al agregar dirección: componente no disponible');
+        } else {
+          await addressListRef.current.addAddress(trimmedLine, useCoords.lat, useCoords.lng);
+        }
+      } catch (err) {
+        console.error('[PAGE] Error adding OCR address:', err);
+        setError('Error al agregar dirección');
       }
     }
+    
     await loadAddresses();
     setActiveTab('addresses');
   };
 
   const handleCalculateRoute = async () => {
     if (!state.startPoint) {
-      setError('Selecciona un punto de inicio');
+      setError('⚠️ Selecciona un punto de inicio en el mapa');
+      return;
+    }
+    if (state.points.length === 0) {
+      setError('📍 Agrega al menos una dirección de destino');
       return;
     }
     setError(null);
     const result = await calculateRoute();
     if (!result) {
-      setError(state.error || 'Error al calcular ruta');
+      setError(state.error || '❌ Error al calcular la ruta. Verificá tu conexión e intentá de nuevo.');
     }
   };
 
@@ -161,15 +168,21 @@ export default function Home() {
   const handleRetry = async () => {
     if (isRetrying) return;
     
+    if (!state.startPoint) {
+      setError('⚠️ Selecciona un punto de inicio en el mapa');
+      setIsRetrying(false);
+      return;
+    }
+    
     setIsRetrying(true);
     try {
       setError(null);
       const result = await calculateRoute();
       if (!result) {
-        setError(state.error || 'Error al calcular ruta');
+        setError(state.error || '❌ Error al calcular la ruta. Verificá tu conexión e intentá de nuevo.');
       }
     } catch {
-      setError(state.error || 'Error al calcular ruta');
+      setError(state.error || '❌ Error al calcular la ruta. Verificá tu conexión e intentá de nuevo.');
     } finally {
       setIsRetrying(false);
     }
@@ -195,19 +208,21 @@ export default function Home() {
       {/* Offline Banner */}
       {!isOnline && <OfflineBanner />}
       
-      {/* Map Section */}
-      <div className={`${isMobile ? 'h-[40vh]' : 'flex-1'} relative z-10`}>
-        <Map
-          center={mapCenter}
-          zoom={14}
-          markers={markers}
-          route={routeCoords}
-          currentPosition={currentPosition}
-        />
+      {/* Map Section - Modern rounded container */}
+      <div className={`${isMobile ? 'h-[40vh]' : 'flex-1'} relative z-10 p-3 md:p-4`}>
+        <div className="w-full h-full rounded-2xl overflow-hidden shadow-xl border border-border/50">
+          <Map
+            center={mapCenter}
+            zoom={14}
+            markers={markers}
+            route={routeCoords}
+            currentPosition={currentPosition}
+          />
+        </div>
         
         {/* StartPointSelector overlay - desktop only */}
         {!isMobile && (
-          <div className="absolute top-4 left-4 z-[1000] flex gap-2">
+          <div className="absolute top-6 left-6 z-[1000] flex gap-3">
             <StartPointSelector
               onStartPointSelect={setStartPoint}
               initialPoint={state.startPoint || undefined}
@@ -217,14 +232,16 @@ export default function Home() {
         )}
       </div>
 
-      {/* Control Panel */}
+      {/* Control Panel - Glassmorphism */}
       <div className={`
-        ${isMobile ? 'flex-1 flex flex-col' : 'w-96 flex flex-col'}
-        bg-surface border-l border-border
+        ${isMobile ? 'flex-1 flex flex-col overflow-visible' : 'w-[420px] flex flex-col overflow-visible'}
+        glass-dark rounded-t-2xl md:rounded-none
+        border-t-2 md:border-t-0 md:border-l border-border/30
+        z-20
       `}>
         {/* Mobile: StartPointSelector at top */}
         {isMobile && (
-          <div className="p-3 border-b border-border">
+          <div className="p-4 border-b border-border/30 bg-surface-muted/50">
             <StartPointSelector
               onStartPointSelect={setStartPoint}
               initialPoint={state.startPoint || undefined}
@@ -234,42 +251,44 @@ export default function Home() {
 
         {/* Error Toast with Retry */}
         {error && (
-          <ErrorToast
-            message={error}
-            onRetry={handleRetry}
-            isRetrying={isRetrying}
-          />
+          <div className="p-4 pb-0">
+            <ErrorToast
+              message={error}
+              onRetry={handleRetry}
+              isRetrying={isRetrying}
+            />
+          </div>
         )}
 
-        {/* Mobile Tabs */}
+        {/* Mobile Tabs - Modern pill style */}
         {isMobile && (
-          <div className="flex border-b border-border">
+          <div className="flex p-3 gap-2 bg-surface-muted/30 mx-4 mt-4 rounded-xl">
             <button
               onClick={() => setActiveTab('addresses')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
                 activeTab === 'addresses' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-muted-foreground'
+                  ? 'bg-gradient-primary text-white shadow-md' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-elevated'
               }`}
             >
               Direcciones
             </button>
             <button
               onClick={() => setActiveTab('ocr')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
                 activeTab === 'ocr' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-muted-foreground'
+                  ? 'bg-gradient-primary text-white shadow-md' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-elevated'
               }`}
             >
               OCR
             </button>
             <button
               onClick={() => setActiveTab('execution')}
-              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
                 activeTab === 'execution' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-muted-foreground'
+                  ? 'bg-gradient-primary text-white shadow-md' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-elevated'
               }`}
             >
               Ejecutar
@@ -278,39 +297,64 @@ export default function Home() {
         )}
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overflow-visible p-4 md:p-6">
           {/* Desktop: Always show all components in stacked layout */}
           {/* Mobile: Show only active tab */}
           
-          {(!isMobile || activeTab === 'addresses') && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                Agregar Direcciones
-              </h2>
-              
-              <AddressInput
-                onAddressSelect={handleAddressSelect}
-                placeholder="Buscar dirección..."
-              />
-
-              <AddressList
-                ref={addressListRef}
-                onAddressesChange={handleAddressesChange}
-              />
+          <div className={`space-y-5 overflow-visible animate-slide-in ${isMobile && activeTab !== 'addresses' ? 'hidden' : ''}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">
+                  Direcciones
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Agrega los puntos de entrega
+                </p>
+              </div>
             </div>
-          )}
+            
+            <AddressInput
+              onAddressSelect={handleAddressSelect}
+              placeholder="Buscar dirección..."
+            />
+
+            {/* Always render AddressList so ref is available for OCR - hide on mobile when not active */}
+            <AddressList
+              ref={addressListRef}
+              onAddressesChange={handleAddressesChange}
+            />
+          </div>
 
           {(!isMobile || activeTab === 'ocr') && (
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">
-                OCR
-              </h2>
+            <div className="mt-8 animate-slide-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    OCR
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Escanear direcciones
+                  </p>
+                </div>
+              </div>
               <OCRUploader onTextExtracted={handleOCRTextExtracted} />
             </div>
           )}
 
           {(state.status === 'completed') && (
-            <div className="mt-6">
+            <div className="mt-8 animate-slide-in">
               <RouteSummary
                 totalDuration={state.totalDuration}
                 totalDistance={state.totalDistance}
@@ -321,7 +365,23 @@ export default function Home() {
           )}
 
           {(!isMobile || activeTab === 'execution') && showExecutionPanel && state.status !== 'completed' && (
-            <div className="mt-6 space-y-4">
+            <div className="mt-8 space-y-5 animate-slide-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-success flex items-center justify-center shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Ejecutar
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Seguimiento en tiempo real
+                  </p>
+                </div>
+              </div>
+
               <RouteInfo
                 currentPoint={state.points[state.currentIndex] || null}
                 nextPoint={state.points[state.currentIndex + 1] || null}
@@ -345,32 +405,41 @@ export default function Home() {
           )}
         </div>
 
-        {/* Calculate Route Button */}
-        {state.status === 'ready' && (
-          <div className="p-4 border-t border-border">
+        {/* Calculate Route Button - Premium styling */}
+        {/* Only show on execution tab for mobile */}
+        {(isMobile ? (activeTab === 'execution' && state.status === 'ready') : state.status === 'ready') && (
+          <div className="p-4 md:p-6 border-t border-border/30 bg-surface-muted/30">
             <button
               onClick={handleStartExecution}
-              className="w-full py-3 min-h-[44px] bg-success text-success-foreground font-medium rounded-lg hover:bg-success-hover transition-colors"
+              className="w-full py-4 min-h-[56px] bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-teal-500/25 hover-glow flex items-center justify-center gap-3 text-lg"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
               Iniciar Recorrido
             </button>
           </div>
         )}
 
         {state.points.length > 0 && state.status !== 'ready' && state.status !== 'executing' && state.status !== 'completed' && (
-          <div className="p-4 border-t border-border">
+          <div className="p-4 md:p-6 border-t border-border/30 bg-surface-muted/30">
             <button
               onClick={handleCalculateRoute}
               disabled={state.status === 'loading'}
-              className="w-full py-3 min-h-[44px] bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-4 min-h-[56px] bg-gradient-primary text-white font-bold rounded-xl hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 text-lg"
             >
               {state.status === 'loading' ? (
                 <>
-                  <LoadingSpinner size="sm" />
+                  <LoadingSpinner size="md" />
                   Calculando ruta...
                 </>
               ) : (
-                'Calcular Ruta'
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Calcular Ruta
+                </>
               )}
             </button>
           </div>

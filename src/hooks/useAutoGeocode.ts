@@ -11,6 +11,8 @@ interface UseAutoGeocodeOptions {
   maxBatchSize?: number;
   /** Delay between geocode requests (ms) */
   delayMs?: number;
+  /** Callback when geocoding completes (for refreshing the map) */
+  onGeocodeComplete?: (geocodedCount: number, failedCount: number) => void;
 }
 
 interface UseAutoGeocodeState {
@@ -24,7 +26,7 @@ interface UseAutoGeocodeState {
  * Hook to automatically geocode pending addresses with rate limiting
  */
 export function useAutoGeocode(options: UseAutoGeocodeOptions = {}) {
-  const { maxBatchSize = 5, delayMs = GEOCODE_DELAY_MS } = options;
+  const { maxBatchSize = 5, delayMs = GEOCODE_DELAY_MS, onGeocodeComplete } = options;
   
   const [state, setState] = useState<UseAutoGeocodeState>({
     isGeocoding: false,
@@ -97,7 +99,12 @@ export function useAutoGeocode(options: UseAutoGeocodeOptions = {}) {
       failedCount: prev.failedCount + failedCount,
       currentAddress: null,
     }));
-  }, [maxBatchSize, delayMs]);
+
+    // Trigger callback if any addresses were geocoded (success or failed)
+    if (onGeocodeComplete && (geocodedCount > 0 || failedCount > 0)) {
+      onGeocodeComplete(geocodedCount, failedCount);
+    }
+  }, [maxBatchSize, delayMs, onGeocodeComplete]);
 
   // Auto-geocode on mount and when new pending addresses are added
   useEffect(() => {

@@ -55,15 +55,19 @@ export function ExecutionPanel({
     setIsDeviating(result.isDeviating);
     setDistanceToRoute(result.distanceToRoute);
 
-    // Check if distance to next point < distance to route (recalculate condition)
+    // Check if we should recalculate: only when closer to next point than route
+    // AND within reasonable distance (500m) - prevents excessive recalculations while driving
     if (onRecalculate && nextPoint && !hasRecalculated.current) {
       const distanceToNextPoint = calculateDistance(
         position.lat, position.lng,
         nextPoint.lat, nextPoint.lng
       );
       
-      // If closer to next point than to route, trigger recalculation
-      if (distanceToNextPoint < result.distanceToRoute) {
+      // Only recalculate if within 500m of next point and closer to it than route
+      // This prevents constant recalculation while driving
+      const MIN_DISTANCE_THRESHOLD_KM = 0.5; // 500 meters
+      if (distanceToNextPoint < MIN_DISTANCE_THRESHOLD_KM && 
+          distanceToNextPoint < result.distanceToRoute) {
         hasRecalculated.current = true;
         onRecalculate();
         
@@ -100,9 +104,9 @@ export function ExecutionPanel({
   };
 
   const getAccuracyColor = (accuracy: number): string => {
-    if (accuracy < 10) return 'text-success';
-    if (accuracy < 30) return 'text-warning';
-    return 'text-error';
+    if (accuracy < 10) return 'text-emerald-600 dark:text-emerald-400';
+    if (accuracy < 30) return 'text-amber-600 dark:text-amber-400';
+    return 'text-rose-600 dark:text-rose-400';
   };
 
   const handleAddStopClick = () => {
@@ -119,27 +123,32 @@ export function ExecutionPanel({
   };
 
   return (
-    <div className="bg-card rounded-lg shadow-md p-4 space-y-4">
-      {/* GPS Status */}
+    <div className="bg-surface border border-border/50 rounded-2xl p-5 space-y-5 shadow-lg hover:shadow-xl transition-all duration-300">
+      {/* GPS Status - Modern pill style */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-success animate-pulse' : 'bg-muted-foreground'}`} />
-          <span className="text-sm text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${isTracking ? 'bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50' : 'bg-muted-foreground'}`} />
+          <span className="text-sm font-medium text-muted-foreground">
             {isTracking ? 'GPS activo' : 'GPS inactivo'}
           </span>
         </div>
         
         {position && (
-          <span className={`text-xs font-medium ${getAccuracyColor(position.accuracy)}`}>
-            Precisión: {formatAccuracy(position.accuracy)}
+          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${getAccuracyColor(position.accuracy)} bg-current/10`}>
+            {formatAccuracy(position.accuracy)}
           </span>
         )}
       </div>
 
-      {/* Error message */}
+      {/* Error message - Modern style */}
       {error && (
-        <div className="bg-error-light border border-error rounded-lg p-3">
-          <p className="text-sm text-error">{error}</p>
+        <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-950/30 dark:to-red-950/30 border border-rose-200 dark:border-rose-800 rounded-xl p-4">
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm text-rose-700 dark:text-rose-300 font-medium">{error}</p>
+          </div>
         </div>
       )}
 
@@ -151,61 +160,66 @@ export function ExecutionPanel({
         />
       )}
 
-      {/* Position display */}
+      {/* Position display - Modern card style */}
       {position && (
-        <div className="bg-muted rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-1">Tu posición</p>
+        <div className="bg-gradient-to-br from-surface-muted to-surface-elevated rounded-xl p-4 border border-border/30">
+          <div className="flex items-center gap-2 mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            </svg>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tu posición</p>
+          </div>
           <p className="text-sm font-mono text-foreground">
             {position.lat.toFixed(6)}, {position.lng.toFixed(6)}
           </p>
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* Action buttons - Premium styling */}
       {isActive && (
         <div className="space-y-3 pt-2">
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleAddStopClick}
-              className="px-4 py-3 min-h-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
+              className="px-4 py-3.5 min-h-[52px] bg-surface border-2 border-border hover:border-secondary hover:bg-secondary-light text-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Agregar parada
+              Agregar
             </button>
 
             <button
               onClick={onComplete}
-              className="px-4 py-3 min-h-[44px] bg-success text-success-foreground rounded-lg hover:bg-success-hover transition-colors flex items-center justify-center gap-2"
+              className="px-4 py-3.5 min-h-[52px] bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:shadow-emerald-500/25 hover-glow"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Completar entrega
+              Completar
             </button>
           </div>
         </div>
       )}
 
-      {/* Recalculate button - show when not executing but has route */}
+      {/* Recalculate button - Premium styling */}
       {route && route.length > 0 && !isActive && (
         <button
           onClick={onRecalculate}
-          className="w-full px-4 py-3 min-h-[44px] bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
+          className="w-full px-4 py-3.5 min-h-[52px] bg-gradient-primary text-white font-bold rounded-xl hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          <span className="font-medium">Recalcular Ruta</span>
+          <span className="font-semibold">Recalcular Ruta</span>
         </button>
       )}
 
-      {/* Cancel button */}
+      {/* Cancel button - Modern outline style */}
       {isActive && (
         <button
           onClick={onCancel}
-          className="w-full px-4 py-2 min-h-[44px] border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm"
+          className="w-full px-4 py-3 min-h-[48px] border-2 border-border text-muted-foreground font-medium rounded-xl hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all duration-200 text-sm"
         >
           Cancelar recorrido
         </button>

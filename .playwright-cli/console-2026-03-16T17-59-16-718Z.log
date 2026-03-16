@@ -1,0 +1,20 @@
+[ 1021914ms] [ERROR] ./src/app/page.tsx
+Error:   × Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+     ╭─[C:\Users\maxid\Documents\Portfolio\route-flow\src\app\page.tsx:342:1]
+ 339 │               onAddressesChange={handleAddressesChange}
+ 340 │             />
+ 341 │           </div>
+ 342 │           )}
+     ·            ▲
+ 343 │ 
+ 344 │           {(!isMobile || activeTab === 'ocr') && (
+ 345 │             <div className="mt-8 animate-slide-in">
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 1275638ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/?_rsc=1ch6o:0
+[ 1275648ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/?_rsc=1ch6o:0

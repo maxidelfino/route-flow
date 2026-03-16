@@ -97,7 +97,12 @@ export async function searchAddresses(query: string): Promise<SearchResult[]> {
 
   await rateLimit();
 
-  const url = `${NOMINATIM_BASE}/search?format=json&q=${encodeURIComponent(query)}&countrycodes=AR&limit=5`;
+  // Add Rosario context to improve results for local users
+  const enhancedQuery = /rosario|santa fe/i.test(query) 
+    ? query 
+    : `${query}, Rosario`;
+    
+  const url = `${NOMINATIM_BASE}/search?format=json&q=${encodeURIComponent(enhancedQuery)}&countrycodes=AR&limit=5`;
   
   const response = await fetch(url, {
     headers: {

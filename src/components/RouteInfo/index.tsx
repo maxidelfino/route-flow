@@ -25,7 +25,7 @@ export function RouteInfo({
 }: RouteInfoProps) {
   if (!currentPoint) {
     return (
-      <div className="bg-card rounded-lg shadow-md p-4 text-center text-muted-foreground">
+      <div className="bg-card rounded-lg shadow-md p-4 text-center text-muted-foreground hover:shadow-lg transition-all duration-200">
         <p>No hay recorrido activo</p>
         <p className="text-sm mt-1">Calculá una ruta para comenzar</p>
       </div>
@@ -51,7 +51,7 @@ export function RouteInfo({
   };
 
   return (
-    <div className="bg-card rounded-lg shadow-md overflow-hidden">
+    <div className="bg-card rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-200">
       {/* Header with progress */}
       <div className="bg-primary text-primary-foreground p-3">
         <div className="flex justify-between items-center mb-2">

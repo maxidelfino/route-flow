@@ -17,7 +17,7 @@ export interface MapProps {
   center?: [number, number];
   zoom?: number;
   markers?: MapMarker[];
-  route?: [number, number][]; // Not used anymore - DirectionsRenderer handles it
+  route?: [number, number][];
   currentPosition?: { lat: number; lng: number } | null;
   onMarkerClick?: (id: string) => void;
 }
@@ -44,12 +44,12 @@ function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRender
     const service = new google.maps.DirectionsService();
     const renderer = new google.maps.DirectionsRenderer({
       map,
-      suppressMarkers: true, // We handle our own markers
+      suppressMarkers: true,
       preserveViewport: false,
       polylineOptions: {
-        strokeColor: '#3b82f6',
-        strokeWeight: 4,
-        strokeOpacity: 0.8,
+        strokeColor: '#14b8a6', // teal-500
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
       },
     });
 
@@ -71,7 +71,7 @@ function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRender
         location: new google.maps.LatLng(wp.lat, wp.lng),
         stopover: true,
       })),
-      optimizeWaypoints: false, // Already optimized by backend
+      optimizeWaypoints: false,
       travelMode: google.maps.TravelMode.DRIVING,
     };
 
@@ -87,7 +87,7 @@ function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRender
   return null;
 }
 
-// Custom marker component using AdvancedMarker
+// Custom marker component using AdvancedMarker with modern styling
 function CustomMarker({ 
   marker, 
   index, 
@@ -100,18 +100,16 @@ function CustomMarker({
   const color = useMemo(() => {
     switch (marker.status) {
       case 'completed':
-        return '#22c55e'; // green
+        return '#10b981'; // emerald-500
       case 'active':
-        return '#f59e0b'; // amber
+        return '#f59e0b'; // amber-500
       case 'start':
-        return '#10b981'; // emerald
+        return '#14b8a6'; // teal-500
       default:
-        return '#3b82f6'; // blue
+        return '#64748b'; // slate-500
     }
   }, [marker.status]);
 
-  // Start point displays as 0, delivery points start at 1
-  // index passed is based on markers array order: [startPoint, point0, point1, ...]
   const displayNumber = marker.status === 'start' ? 0 : index;
 
   return (
@@ -122,8 +120,8 @@ function CustomMarker({
       <div
         style={{
           backgroundColor: color,
-          width: '32px',
-          height: '32px',
+          width: '36px',
+          height: '36px',
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
@@ -132,9 +130,16 @@ function CustomMarker({
           fontWeight: 'bold',
           fontSize: '14px',
           border: '3px solid white',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3)',
           cursor: 'pointer',
           transform: 'translate(-50%, -50%)',
+          transition: 'transform 0.2s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.15)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
         }}
       >
         {displayNumber}
@@ -143,20 +148,50 @@ function CustomMarker({
   );
 }
 
-// Current position marker
+// Current position marker - Pulsing blue dot
 function CurrentPositionMarker({ position }: { position: { lat: number; lng: number } }) {
   return (
     <AdvancedMarker position={position}>
       <div
         style={{
-          width: '24px',
-          height: '24px',
-          borderRadius: '50%',
-          backgroundColor: '#0ea5e9',
-          border: '3px solid white',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          position: 'relative',
+          width: '20px',
+          height: '20px',
         }}
-      />
+      >
+        {/* Pulse effect */}
+        <div
+          style={{
+            position: 'absolute',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            backgroundColor: '#0ea5e9',
+            opacity: 0.4,
+            animation: 'pulse 2s ease-out infinite',
+          }}
+        />
+        {/* Inner dot */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '3px',
+            left: '3px',
+            width: '14px',
+            height: '14px',
+            borderRadius: '50%',
+            backgroundColor: '#0ea5e9',
+            border: '2px solid white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        />
+        <style>{`
+          @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.4; }
+            100% { transform: scale(2.5); opacity: 0; }
+          }
+        `}</style>
+      </div>
     </AdvancedMarker>
   );
 }
@@ -170,17 +205,11 @@ function MapContent({
   onMarkerClick,
 }: MapProps) {
   // Determine route origin and destination for DirectionsRenderer
-  // Markers array: [startPoint?, point0, point1, point2, ...]
   const routeInfo = useMemo(() => {
     if (markers.length < 2) return null;
 
-    // Find start marker (status='start') or use first marker
     const startMarker = markers.find(m => m.status === 'start') || markers[0];
-    
-    // Find the last marker (destination)
     const lastMarker = markers[markers.length - 1];
-    
-    // All markers between start and end are waypoints
     const waypointMarkers = markers.slice(1, -1);
 
     if (!lastMarker || startMarker.id === lastMarker.id) return null;
@@ -247,19 +276,29 @@ export default function MapComponent(props: MapProps) {
 
   if (!isMounted) {
     return (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <span className="text-muted-foreground">Cargando mapa...</span>
+      <div className="w-full h-full bg-gradient-to-br from-surface-muted to-surface-elevated flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <span className="text-muted-foreground">Cargando mapa...</span>
+        </div>
       </div>
     );
   }
 
   if (!apiKey) {
     return (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <span className="text-muted-foreground text-center p-4">
-          API de Google Maps no configurada.<br />
-          Configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en .env.local
-        </span>
+      <div className="w-full h-full bg-gradient-to-br from-surface-muted to-surface-elevated flex items-center justify-center">
+        <div className="text-center p-6 max-w-sm">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <span className="text-foreground font-medium block mb-2">API de Google Maps no configurada</span>
+          <span className="text-muted-foreground text-sm">
+            Configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en .env.local
+          </span>
+        </div>
       </div>
     );
   }

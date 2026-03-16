@@ -1,38 +1,38 @@
 @import "tailwindcss";
 
 :root {
-  /* Light mode colors */
-  --background: #ffffff;
+  /* ========== BRAND COLORS - Modern Teal ========== */
+  --color-primary: #14b8a6;        /* teal-500 - Main brand */
+  --color-primary-hover: #0d9488;  /* teal-600 - Hover */
+  --color-primary-light: #f0fdfa;  /* teal-50 - Light bg */
+  --color-primary-dark: #134e4a;   /* teal-900 - Dark bg */
+
+  /* ========== LIGHT MODE ========== */
+  --background: #fafbfc;
   --foreground: #0f172a;
   
   /* Surface colors */
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f1f5f9;
   --surface-elevated: #ffffff;
   
-  /* Primary - Blue for actions */
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --primary-hover: #1d4ed8;
-  --primary-light: #dbeafe;
-  
-  /* Secondary - Gray for secondary actions */
+  /* Secondary - Slate */
   --secondary: #64748b;
   --secondary-foreground: #ffffff;
   --secondary-hover: #475569;
   --secondary-light: #f1f5f9;
   
-  /* Accent - Amber for highlights */
+  /* Accent - Amber */
   --accent: #f59e0b;
   --accent-foreground: #000000;
   --accent-hover: #d97706;
   --accent-light: #fef3c7;
   
-  /* Success - Green */
-  --success: #22c55e;
+  /* Success - Emerald */
+  --success: #10b981;
   --success-foreground: #ffffff;
-  --success-hover: #16a34a;
-  --success-light: #dcfce7;
+  --success-hover: #059669;
+  --success-light: #d1fae5;
   
   /* Warning - Yellow */
   --warning: #eab308;
@@ -40,17 +40,17 @@
   --warning-hover: #ca8a04;
   --warning-light: #fef9c3;
   
-  /* Error - Red */
-  --error: #ef4444;
+  /* Error - Rose */
+  --error: #f43f5e;
   --error-foreground: #ffffff;
-  --error-hover: #dc2626;
-  --error-light: #fee2e2;
+  --error-hover: #e11d48;
+  --error-light: #ffe4e6;
   
   /* Border and input */
   --border: #e2e8f0;
   --border-hover: #cbd5e1;
   --input: #e2e8f0;
-  --ring: #2563eb;
+  --ring: #14b8a6;
   
   /* Muted colors */
   --muted: #f1f5f9;
@@ -63,42 +63,54 @@
   /* Popover colors */
   --popover: #ffffff;
   --popover-foreground: #0f172a;
+
+  /* ========== GLASSMORPHISM VARIABLES ========== */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  
+  /* ========== GRADIENTS ========== */
+  --gradient-primary: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  --gradient-primary-glow: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 50%, #0d9488 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Dark mode colors */
-    --background: #0f172a;
-    --foreground: #f8fafc;
+    /* ========== DARK MODE ========== */
+    --background: #0c0f17;
+    --foreground: #f1f5f9;
     
-    /* Surface colors */
-    --surface: #1e293b;
-    --surface-muted: #0f172a;
-    --surface-elevated: #334155;
+    /* Surface colors - Rich dark */
+    --surface: #151a27;
+    --surface-muted: #0c0f17;
+    --surface-elevated: #1e2436;
     
-    /* Primary */
-    --primary: #3b82f6;
-    --primary-foreground: #ffffff;
-    --primary-hover: #60a5fa;
-    --primary-light: #1e3a5f;
+    /* Primary - Teal adapts well to dark */
+    --primary: #2dd4bf;
+    --primary-foreground: #042f2e;
+    --primary-hover: #5eead4;
+    --primary-light: #134e4a;
+    --primary-dark: #042f2e;
     
     /* Secondary */
     --secondary: #94a3b8;
-    --secondary-foreground: #ffffff;
+    --secondary-foreground: #0f172a;
     --secondary-hover: #cbd5e1;
-    --secondary-light: #334155;
+    --secondary-light: #1e293b;
     
     /* Accent */
     --accent: #fbbf24;
     --accent-foreground: #000000;
     --accent-hover: #f59e0b;
-    --accent-light: #451a03;
+    --accent-light: #422006;
     
     /* Success */
-    --success: #4ade80;
-    --success-foreground: #000000;
-    --success-hover: #22c55e;
-    --success-light: #14532d;
+    --success: #34d399;
+    --success-foreground: #022c22;
+    --success-hover: #10b981;
+    --success-light: #064e3b;
     
     /* Warning */
     --warning: #facc15;
@@ -107,28 +119,33 @@
     --warning-light: #422006;
     
     /* Error */
-    --error: #f87171;
-    --error-foreground: #000000;
-    --error-hover: #ef4444;
-    --error-light: #450a0a;
+    --error: #fb7185;
+    --error-foreground: #881337;
+    --error-hover: #f43f5e;
+    --error-light: #4c0519;
     
     /* Border and input */
-    --border: #334155;
-    --border-hover: #475569;
-    --input: #334155;
-    --ring: #3b82f6;
+    --border: #2a3142;
+    --border-hover: #3d4657;
+    --input: #1e2436;
+    --ring: #2dd4bf;
     
     /* Muted colors */
-    --muted: #1e293b;
+    --muted: #1e2436;
     --muted-foreground: #94a3b8;
     
     /* Card colors */
-    --card: #1e293b;
-    --card-foreground: #f8fafc;
+    --card: #151a27;
+    --card-foreground: #f1f5f9;
     
     /* Popover colors */
-    --popover: #1e293b;
-    --popover-foreground: #f8fafc;
+    --popover: #1e2436;
+    --popover-foreground: #f1f5f9;
+
+    /* ========== GLASSMORPHISM - DARK MODE ========== */
+    --glass-bg: rgba(21, 26, 39, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -196,14 +213,16 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   
-  /* Typography */
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography - Poppins for headings */
+  --font-sans: var(--font-poppins), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   
   /* Border radius */
-  --radius-sm: 0.25rem;
+  --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
   
   /* Shadows */
@@ -211,6 +230,8 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px rgba(20, 184, 166, 0.3);
+  --shadow-glow-strong: 0 0 30px rgba(20, 184, 166, 0.5);
 }
 
 body {
@@ -221,21 +242,166 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom utility classes for design tokens */
+/* ========== CUSTOM UTILITIES ========== */
 
-/* Focus ring utility */
+/* Glassmorphism - Light */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Glassmorphism - Dark */
+.glass-dark {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Gradient backgrounds */
+.bg-gradient-primary {
+  background: var(--gradient-primary);
+}
+
+.bg-gradient-success {
+  background: var(--gradient-success);
+}
+
+.bg-gradient-surface {
+  background: var(--gradient-surface);
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: var(--shadow-glow);
+}
+
+.glow-primary-strong {
+  box-shadow: var(--shadow-glow-strong);
+}
+
+/* Hover glow animation */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(20, 184, 166, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(20, 184, 166, 0.5);
+  }
+}
+
+.hover-glow:hover {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ========== FOCUS & INTERACTION ========== */
+
+/* Focus ring utility - teal */
 .focus-ring:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px var(--background);
 }
 
-/* Touch target minimum (44px for mobile) */
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Button hover lift effect */
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Focus-visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Touch target minimum */
 .touch-target {
   min-height: 44px;
   min-width: 44px;
 }
 
-/* Ensure Leaflet zoom controls are always clickable and above other elements */
+/* ========== SHIMMER EFFECT FOR SKELETONS ========== */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    var(--surface-elevated) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ========== FLOATING ANIMATION ========== */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ========== SLIDE IN ANIMATION ========== */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* ========== SCALE IN ANIMATION ========== */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* ========== LEAFLET Z-INDEX FIXES ========== */
 .leaflet-control-zoom {
   z-index: 1000 !important;
   pointer-events: auto !important;
@@ -244,4 +410,39 @@ body {
 .leaflet-control-container .leaflet-top,
 .leaflet-control-container .leaflet-bottom {
   z-index: 999 !important;
+}
+
+/* ========== CUSTOM SCROLLBAR ========== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+/* ========== INPUT AUTOFILL FIX ========== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground) !important;
 }

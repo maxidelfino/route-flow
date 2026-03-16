@@ -30,7 +30,7 @@ export function RouteSummary({
   };
 
   return (
-    <div className="bg-card rounded-lg shadow-md p-6 space-y-6">
+    <div className="bg-card rounded-lg shadow-md p-6 space-y-6 hover:shadow-lg transition-all duration-200">
       {/* Header */}
       <div className="text-center">
         <div className="w-16 h-16 bg-success-light rounded-full flex items-center justify-center mx-auto mb-4">
@@ -72,7 +72,7 @@ export function RouteSummary({
       {/* New Route Button */}
       <button
         onClick={onNewRoute}
-        className="w-full py-3 min-h-[44px] bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary-hover transition-colors"
+        className="w-full py-3 min-h-[44px] bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg"
       >
         Iniciar Nuevo Recorrido
       </button>

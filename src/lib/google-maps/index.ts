@@ -18,9 +18,6 @@ export * from './types';
 export * from './polyline';
 export * from './validation';
 
-// Re-export the main client class
-export { GoogleMapsClient };
-
 // ============================================
 // Factory Functions
 // ============================================

@@ -88,7 +88,7 @@ export function useRoute() {
     if (!startPoint) {
       setState(prev => ({
         ...prev,
-        error: 'No start point or addresses defined',
+        error: 'Selecciona un punto de inicio primero',
       }));
       return null;
     }
@@ -96,12 +96,16 @@ export function useRoute() {
     if (state.points.length === 0) {
       setState(prev => ({
         ...prev,
-        error: 'No addresses defined',
+        error: 'Agrega al menos una dirección de destino',
       }));
       return null;
     }
 
-    setState(prev => ({ ...prev, status: 'loading', error: null }));
+    // Only show loading status when NOT recalculating during execution
+    const isRecalculatingDuringExecution = state.status === 'executing';
+    if (!isRecalculatingDuringExecution) {
+      setState(prev => ({ ...prev, status: 'loading', error: null }));
+    }
 
     try {
       const response = await fetch('/api/route-optimize', {
@@ -141,15 +145,36 @@ export function useRoute() {
         status: (i === 0 ? 'current' : 'pending') as RoutePoint['status'],
       }));
 
+      // Persist the optimized order to storage
+      // The order should match the optimized route (excluding 'start')
+      const optimizedOrderIds = result.route.slice(1);
+      for (let i = 0; i < optimizedOrderIds.length; i++) {
+        const pointId = optimizedOrderIds[i];
+        await addressStorage.update(pointId, { order: i });
+      }
+
+      // Preserve currentIndex and point statuses when recalculating during execution
+      const isExecuting = state.status === 'executing';
+      const preservedCurrentIndex = isExecuting ? state.currentIndex : 0;
+      
+      // When recalculating during execution, restore point statuses around currentIndex
+      const restoredPoints: RoutePoint[] = isExecuting 
+        ? updatedPoints.map((p, i) => ({
+            ...p,
+            status: (i < state.currentIndex ? 'completed' : 
+                    i === state.currentIndex ? 'current' : 'pending') as RoutePoint['status'],
+          }))
+        : updatedPoints;
+
       setState(prev => ({
         ...prev,
-        status: 'ready',
+        status: prev.status === 'executing' ? 'executing' : 'ready', // Preserve 'executing' if recalculating during active execution
         route: result.route,
         polyline: result.polyline as [number, number][] | null,
-        points: updatedPoints,
+        points: restoredPoints,
         totalDuration: result.totalDuration,
         totalDistance: result.totalDistance,
-        currentIndex: 0,
+        currentIndex: preservedCurrentIndex,
         error: null,
       }));
 

@@ -140,14 +140,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Use Nominatim for search (autocomplete) - Google Places is separate API
-    // Google Places API would be needed for proper autocomplete
+    // Use Nominatim for search - it's reliable and free
+    // Google Places API would give better results but requires additional setup
     const results = await nominatimSearch(query);
     return NextResponse.json({ results, _provider: 'nominatim' });
   } catch (error) {
     console.error('Search API error:', error);
     return NextResponse.json(
-      { error: 'Search failed' },
+      { error: 'Search failed', results: [] },
       { status: 500 }
     );
   }

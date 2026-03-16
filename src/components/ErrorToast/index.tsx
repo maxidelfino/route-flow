@@ -23,7 +23,7 @@ export function ErrorToast({
           <button
             onClick={onRetry}
             disabled={isRetrying}
-            className="px-3 py-1 min-h-[32px] bg-error text-error-foreground text-xs font-medium rounded hover:bg-error-hover transition-colors disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
+            className="px-3 py-1 min-h-[32px] bg-error text-error-foreground text-xs font-medium rounded hover:bg-error-hover transition-colors disabled:opacity-50 flex items-center gap-1 whitespace-nowrap cursor-pointer"
           >
             {isRetrying ? (
               <>
