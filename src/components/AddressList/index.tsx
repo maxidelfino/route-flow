@@ -159,9 +159,10 @@ function SortableAddressItem({ address, index, onDelete }: AddressItemProps) {
 
 interface AddressListProps {
   onAddressesChange?: (addresses: Address[]) => void;
+  scrollable?: boolean;
 }
 
-export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAddressesChange }, ref) => {
+export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAddressesChange, scrollable = false }, ref) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -299,7 +300,7 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
   }
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${scrollable ? 'max-h-[calc(60vh-200px)] overflow-y-auto pr-1 -mr-1' : ''}`}>
       {/* Geocoding indicator - Refined style */}
       {isGeocoding && (
         <div className="flex items-center gap-3 p-3.5 bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200/50 dark:border-amber-800/40 rounded-xl text-sm">
@@ -362,7 +363,7 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
           {/* Visual hint - subtle */}
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
             <span>Usá el formulario de arriba</span>
           </div>

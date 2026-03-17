@@ -39,6 +39,77 @@ export default function Home() {
   const [isRetrying, setIsRetrying] = useState(false);
   const addressListRef = useRef<AddressListRef>(null);
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [routeMode, setRouteMode] = useState<'linear' | 'circular'>('circular');
+  
+  // Estimated times for both route modes
+  const [routeTimes, setRouteTimes] = useState<{
+    circular: { duration: number; distance: number } | null;
+    linear: { duration: number; distance: number } | null;
+  }>({ circular: null, linear: null });
+  const [isCalculatingTimes, setIsCalculatingTimes] = useState(false);
+
+  // Calculate route times for both modes
+  const calculateBothRouteTimes = useCallback(async () => {
+    if (!state.startPoint || state.points.length === 0) return;
+    
+    setIsCalculatingTimes(true);
+    
+    try {
+      // Calculate both routes in parallel
+      const [circularResult, linearResult] = await Promise.all([
+        fetch('/api/route-optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start: [state.startPoint!.lng, state.startPoint!.lat],
+            points: state.points.map(p => ({ id: p.id, lat: p.lat, lng: p.lng })),
+            mode: 'circular',
+          }),
+        }).then(r => r.json()).catch(() => null),
+        fetch('/api/route-optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start: [state.startPoint!.lng, state.startPoint!.lat],
+            points: state.points.map(p => ({ id: p.id, lat: p.lat, lng: p.lng })),
+            mode: 'linear',
+          }),
+        }).then(r => r.json()).catch(() => null),
+      ]);
+      
+      setRouteTimes({
+        circular: circularResult ? { 
+          duration: circularResult.totalDuration, 
+          distance: circularResult.totalDistance 
+        } : null,
+        linear: linearResult ? { 
+          duration: linearResult.totalDuration, 
+          distance: linearResult.totalDistance 
+        } : null,
+      });
+    } catch (error) {
+      console.error('Error calculating route times:', error);
+    } finally {
+      setIsCalculatingTimes(false);
+    }
+  }, [state.startPoint, state.points]);
+
+  // Calculate times when route is ready and mode selector is shown
+  useEffect(() => {
+    if (state.status === 'ready' && state.startPoint && state.points.length > 0) {
+      calculateBothRouteTimes();
+    }
+  }, [state.status, state.startPoint, state.points.length, calculateBothRouteTimes]);
+
+  // Format duration for display
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${Math.round(minutes)} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours}h ${mins}m`;
+  };
 
   const handleAddressesChange = useCallback(async (_addresses: Address[]) => {
     await loadAddresses();
@@ -99,7 +170,7 @@ export default function Home() {
       await loadAddresses();
       
       if (state.startPoint && state.points.length > 0 && state.status !== 'executing') {
-        await calculateRoute();
+        await calculateRoute(undefined, routeMode);
       }
     } catch {
       setError('Error al agregar dirección');
@@ -144,7 +215,7 @@ export default function Home() {
       return;
     }
     setError(null);
-    const result = await calculateRoute();
+    const result = await calculateRoute(undefined, routeMode);
     if (!result) {
       setError(state.error || '❌ Error al calcular la ruta. Verificá tu conexión e intentá de nuevo.');
     }
@@ -177,7 +248,7 @@ export default function Home() {
     setIsRetrying(true);
     try {
       setError(null);
-      const result = await calculateRoute();
+      const result = await calculateRoute(undefined, routeMode);
       if (!result) {
         setError(state.error || '❌ Error al calcular la ruta. Verificá tu conexión e intentá de nuevo.');
       }
@@ -234,7 +305,7 @@ export default function Home() {
 
       {/* Control Panel - Glassmorphism */}
       <div className={`
-        ${isMobile ? 'flex-1 flex flex-col overflow-visible' : 'w-[420px] flex flex-col overflow-visible'}
+        ${isMobile ? 'flex-1 flex flex-col' : 'w-[420px] flex flex-col overflow-visible'}
         glass-dark rounded-t-2xl md:rounded-none
         border-t-2 md:border-t-0 md:border-l border-border/30
         z-20
@@ -297,7 +368,7 @@ export default function Home() {
         )}
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto overflow-visible p-4 md:p-6">
+        <div className={`${isMobile ? 'h-[calc(60vh-140px)] min-h-0' : 'flex-1'} ${isMobile ? 'flex flex-col' : ''} overflow-hidden p-4 md:p-6`}>
           {/* Desktop: Always show all components in stacked layout */}
           {/* Mobile: Show only active tab */}
           
@@ -325,14 +396,18 @@ export default function Home() {
             />
 
             {/* Always render AddressList so ref is available for OCR - hide on mobile when not active */}
-            <AddressList
-              ref={addressListRef}
-              onAddressesChange={handleAddressesChange}
-            />
+            {/* Mobile: scrollable list to preserve map space */}
+            <div className={isMobile ? 'flex-1 min-h-0 overflow-hidden' : ''}>
+              <AddressList
+                ref={addressListRef}
+                onAddressesChange={handleAddressesChange}
+                scrollable={isMobile}
+              />
+            </div>
           </div>
 
           {(!isMobile || activeTab === 'ocr') && (
-            <div className="mt-8 animate-slide-in">
+            <div className={`mt-8 animate-slide-in ${isMobile ? 'flex-1 min-h-0 overflow-y-auto' : ''}`}>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -365,7 +440,7 @@ export default function Home() {
           )}
 
           {(!isMobile || activeTab === 'execution') && showExecutionPanel && state.status !== 'completed' && (
-            <div className="mt-8 space-y-5 animate-slide-in">
+            <div className={`mt-8 space-y-5 animate-slide-in ${isMobile ? 'flex-1 min-h-0 overflow-y-auto' : ''}`}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-success flex items-center justify-center shadow-md">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -398,8 +473,12 @@ export default function Home() {
                 onAddStop={() => setActiveTab('addresses')}
                 route={routeCoords}
                 onPositionUpdate={setCurrentPosition}
-                onRecalculate={handleCalculateRoute}
+                onRecalculate={() => calculateRoute(undefined, routeMode)}
                 nextPoint={state.points[state.currentIndex + 1] || null}
+                routeMode={routeMode}
+                onRouteModeChange={setRouteMode}
+                routeTimes={routeTimes}
+                isCalculatingTimes={isCalculatingTimes}
               />
             </div>
           )}
@@ -417,30 +496,6 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Iniciar Recorrido
-            </button>
-          </div>
-        )}
-
-        {state.points.length > 0 && state.status !== 'ready' && state.status !== 'executing' && state.status !== 'completed' && (
-          <div className="p-4 md:p-6 border-t border-border/30 bg-surface-muted/30">
-            <button
-              onClick={handleCalculateRoute}
-              disabled={state.status === 'loading'}
-              className="w-full py-4 min-h-[56px] bg-gradient-primary text-white font-bold rounded-xl hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 text-lg"
-            >
-              {state.status === 'loading' ? (
-                <>
-                  <LoadingSpinner size="md" />
-                  Calculando ruta...
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                  Calcular Ruta
-                </>
-              )}
             </button>
           </div>
         )}

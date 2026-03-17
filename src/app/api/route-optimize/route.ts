@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDirections, decodePolyline, isGoogleMapsConfigured } from '@/lib/google-maps';
-import { optimizeAndCalculate, optimizeRouteLocal, Point } from '@/lib/tsp';
+import { optimizeAndCalculate, optimizeRouteLocal, optimizeRouteLinear, Point } from '@/lib/tsp';
 import { createStraightLinePolyline } from '@/lib/routing/local';
+
+export type OptimizeMode = 'linear' | 'circular';
 
 export interface OptimizeRequest {
   start: [number, number]; // [lng, lat]
   points: Array<{ id: string; lat: number; lng: number }>;
   alpha?: number;
   beta?: number;
+  mode?: OptimizeMode; // 'linear' = open path (no return to start), 'circular' = closed loop
 }
 
 export interface OptimizeResponse {
@@ -16,6 +19,7 @@ export interface OptimizeResponse {
   totalDuration: number; // minutes
   totalDistance: number; // km
   etas: number[]; // minutes to each point
+  mode: OptimizeMode; // 'linear' or 'circular'
   steps?: Array<{
     instruction: string;
     duration: number;
@@ -35,11 +39,19 @@ export interface OptimizeResponse {
 export async function POST(request: NextRequest) {
   try {
     const body: OptimizeRequest = await request.json();
-    const { start, points, alpha = 0.7, beta = 0.3 } = body;
+    const { start, points, alpha = 0.7, beta = 0.3, mode = 'circular' } = body;
 
     if (!start || !points || points.length === 0) {
       return NextResponse.json(
         { error: 'Invalid request: start and points required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate mode
+    if (mode !== 'linear' && mode !== 'circular') {
+      return NextResponse.json(
+        { error: 'Invalid mode. Must be "linear" or "circular"' },
         { status: 400 }
       );
     }
@@ -72,8 +84,10 @@ export async function POST(request: NextRequest) {
     let googleMapsUsed = false;
     let googleOptimized = false;
 
-    // Check if Google Maps API key is available (preferred)
-    if (isGoogleMapsConfigured()) {
+    // Check if Google Maps API key is available
+    // Note: Google Directions always returns a circular route (returns to start)
+    // For linear mode, we use local optimization instead
+    if (isGoogleMapsConfigured() && mode === 'circular') {
       try {
         // Build waypoints from ALL delivery points
         // For proper TSP optimization with round-trip, we use the START point as both
@@ -143,6 +157,7 @@ export async function POST(request: NextRequest) {
           totalDuration: result.totalDuration,
           totalDistance: result.totalDistance,
           etas: result.etas,
+          mode: 'circular', // Google Maps always returns circular
           steps,
           _googleMaps: {
             used: true,
@@ -159,7 +174,14 @@ export async function POST(request: NextRequest) {
 
     // Fallback to local optimization with Haversine distances
     isFallback = true;
-    result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+    
+    // Use linear or circular based on mode
+    if (mode === 'linear') {
+      result = optimizeRouteLinear(tspPoints, { lat: start[1], lng: start[0] });
+    } else {
+      result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
+    }
+    
     const lineResult = createStraightLinePolyline(coordinates);
     polyline = lineResult.coordinates;
 
@@ -175,6 +197,7 @@ export async function POST(request: NextRequest) {
       totalDuration: result.totalDuration,
       totalDistance: result.totalDistance,
       etas: result.etas,
+      mode,
       steps,
       _fallback: isFallback ? {
         used: true,

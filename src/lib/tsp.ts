@@ -103,6 +103,90 @@ export function nearestNeighbor(
 }
 
 /**
+ * Linear Nearest Neighbor - visits closest point sequentially
+ * Does NOT return to start - creates a linear path
+ * Prioritizes visiting nearby points first, regardless of where route ends
+ */
+export function nearestNeighborLinear(
+  points: Point[],
+  startIndex: number,
+  matrix: Matrix
+): number[] {
+  // Matrix includes start point at index 0, so total nodes = points.length + 1
+  const totalNodes = matrix.distances.length;
+  const deliveryPointsCount = totalNodes - 1; // Exclude start
+  
+  if (deliveryPointsCount === 0) return [];
+
+  const visited = new Set<number>();
+  const route = [startIndex];
+  visited.add(startIndex);
+  // Also mark start (0) as visited so we don't return to it
+  visited.add(0);
+
+  while (route.length < totalNodes) {
+    const current = route[route.length - 1];
+    let minDistance = Infinity;
+    let nextIdx = -1;
+
+    // Find nearest unvisited point by distance only (not weighted cost)
+    for (let i = 0; i < totalNodes; i++) {
+      if (visited.has(i)) continue;
+
+      const distance = matrix.distances[current][i];
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nextIdx = i;
+      }
+    }
+
+    if (nextIdx !== -1) {
+      route.push(nextIdx);
+      visited.add(nextIdx);
+    } else {
+      break;
+    }
+  }
+
+  return route;
+}
+
+/**
+ * Full linear route optimization - sequential nearest neighbor
+ * Does NOT return to start point
+ * Prioritizes minimizing distance between consecutive points
+ */
+export function optimizeRouteLinear(
+  points: Point[],
+  startPoint: { lat: number; lng: number }
+): RouteResult {
+  if (points.length === 0) {
+    return { route: [], totalDuration: 0, totalDistance: 0, etas: [] };
+  }
+
+  // Build local matrix with Haversine
+  const matrix = buildLocalMatrix(points, startPoint);
+
+  // Start from index 1 (index 0 is startPoint in matrix)
+  // Get the delivery points route (excluding start)
+  const deliveryRoute = nearestNeighborLinear(points, 1, matrix);
+  
+  // Prepend start point (index 0) to the route
+  const route = [0, ...deliveryRoute];
+  
+  const stats = calculateRouteStats(route, matrix);
+  const etas = calculateETAs(route, matrix);
+
+  return {
+    route,
+    totalDuration: stats.totalDuration,
+    totalDistance: stats.totalDistance,
+    etas,
+  };
+}
+
+/**
  * 2-opt local search improvement
  * Swaps pairs of edges to reduce total cost
  * Fixed: includes segment from start (i=0)
@@ -271,8 +355,9 @@ export function optimizeAndCalculate(
 
 /**
  * Build a local matrix using Haversine distances
+ * Exported for use in linear optimization
  */
-function buildLocalMatrix(points: Point[], startPoint?: { lat: number; lng: number }): Matrix {
+export function buildLocalMatrix(points: Point[], startPoint?: { lat: number; lng: number }): Matrix {
   const allPoints = startPoint
     ? [{ id: 'start', lat: startPoint.lat, lng: startPoint.lng }, ...points]
     : points;

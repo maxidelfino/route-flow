@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { addressStorage } from '@/lib/storage';
 
 export type RouteStatus = 'idle' | 'loading' | 'ready' | 'executing' | 'completed';
+export type OptimizeMode = 'linear' | 'circular';
 
 export interface RoutePoint {
   id: string;
@@ -82,7 +83,10 @@ export function useRoute() {
     }
   }, []);
 
-  const calculateRoute = useCallback(async (fromPosition?: { lat: number; lng: number }) => {
+  const calculateRoute = useCallback(async (
+    fromPosition?: { lat: number; lng: number },
+    mode: OptimizeMode = 'circular'
+  ) => {
     const startPoint = fromPosition || state.startPoint;
     
     if (!startPoint) {
@@ -118,6 +122,7 @@ export function useRoute() {
             lat: p.lat,
             lng: p.lng,
           })),
+          mode,
         }),
       });
 

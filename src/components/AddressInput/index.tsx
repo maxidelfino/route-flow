@@ -33,9 +33,9 @@ export function AddressInput({
   });
 
   const handleResultClick = (result: SearchResult) => {
-    setQuery(result.displayName);
-    setShowResults(false);
     handleSelect(result);
+    setQuery('');
+    setShowResults(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
