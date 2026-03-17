@@ -4,7 +4,7 @@
 
 PWA para optimizar rutas de entrega. Carga hasta 1000 direcciones (manual o OCR), calcula rutas optimizadas priorizando tiempo, y guía al repartidor durante el recorrido con GPS en tiempo real.
 
-![Route Flow App](./docs/screenshots/app-main.png)
+![Address Input](./docs/screenshots/app-address-input.png)
 
 ## Tech Stack
 
@@ -73,14 +73,6 @@ npm run test:coverage
 - **INDEPENDENT**: Funciona sin API key externa
 - **ACTIVE**: Usa Google Maps API como primario
 - **FALLBACK**: Usa ORS o cálculo local cuando Google no está disponible
-
-## Screenshots
-
-### Vista Principal
-![Main View](./docs/screenshots/app-main.png)
-
-### Carga de Direcciones
-![Address Input](./docs/screenshots/app-address-input.png)
 
 ## Configuración
 
