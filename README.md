@@ -26,11 +26,11 @@ PWA para optimizar rutas de entrega. Carga hasta 1000 direcciones (manual o OCR)
 # Install dependencies
 npm install
 
-# Install GGA hooks (AI Code Review)
-npm run gga:install
-
 # Run development server
 npm run dev
+
+# Run tests
+npm run test:run
 ```
 
 ## Scripts
@@ -42,48 +42,17 @@ npm run dev
 | `npm run lint` | Run ESLint |
 | `npm run test` | Run tests in watch mode |
 | `npm run test:run` | Run tests once |
-| `npm run gga:install` | Install GGA hooks |
-| `npm run gga:run` | Run GGA review manually |
-
-## GGA - AI Code Review
-
-Route Flow uses [Gentleman Guardian Angel (GGA)](https://github.com/Gentleman-Programming/gentleman-guardian-angel) for AI-powered code review.
-
-### Setup
+## Testing
 
 ```bash
-npm run gga:install
-```
+# Run tests in watch mode
+npm run test
 
-Configure your AI provider in `.gga`:
+# Run tests once
+npm run test:run
 
-```bash
-# Use Ollama (local, free)
-PROVIDER=ollama:llama3
-
-# Or use Claude
-PROVIDER=claude
-# Set ANTHROPIC_API_KEY environment variable
-
-# Or use Gemini
-PROVIDER=gemini
-# Set GEMINI_API_KEY environment variable
-```
-
-### How It Works
-
-- **pre-commit**: Reviews staged files before commit
-- **pre-push**: Runs tests + GGA review before push
-- **CI**: Runs GGA review on every PR
-
-### Bypass Hooks
-
-```bash
-# Skip pre-commit
-git commit --no-verify -m "message"
-
-# Skip pre-push
-git push --no-verify
+# Run with coverage
+npm run test:coverage
 ```
 
 ## Features

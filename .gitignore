@@ -11,10 +11,9 @@ build/
 
 # Testing
 coverage/
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
+# Test output files (if any)
+*.test.tsx.snap
+*.test.ts.snap
 
 # Misc
 .DS_Store

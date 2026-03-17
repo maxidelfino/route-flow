@@ -32,14 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### CI/CD & Code Quality
 - **GitHub Actions CI**: Created `.github/workflows/ci.yml`
   - Runs lint, tests, and build on push/PR
-  - Runs GGA AI code review on PRs
 
-- **GGA Integration**: Added Gentleman Guardian Angel for AI-powered code review
-  - `AGENTS.md`: Coding standards documentation
-  - `.gga`: GGA configuration
-  - `scripts/setup-hooks.sh`: Hook installation script
-  - Pre-commit hook: Reviews staged files before commit
-  - Pre-push hook: Runs tests + GGA review before push
+- **Husky Hooks**: Setup pre-commit hook for running tests
+  - Pre-commit: Runs unit tests before commit
 
 ### Changed
 
