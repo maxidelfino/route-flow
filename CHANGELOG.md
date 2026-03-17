@@ -5,51 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [1.0.0] - 2026-03-13
+## [1.0.0] - 2026-03-17
 
 ### Added
 
-#### Architecture & Routing
-- **Fallback System**: Implemented robust fallback system for when ORS API key is not configured
-  - New folder structure: `src/lib/routing/ors/` (API-dependent) and `src/lib/routing/local/` (fallback)
-  - Automatic fallback from ORS to local Haversine calculations
-  - `isFallback` flag in all route/matrix responses
+#### Google Maps Platform Integration
+- **Migration from Leaflet/ORS to Google Maps**: Complete rewrite of map integration
+  - New `@vis.gl/react-google-maps` library for map rendering
+  - Google Directions API for route optimization
+  - Google Distance Matrix API for time/distance calculations
+  - Google Geocoding API for address resolution
+  - Fallback chain: Google Maps → ORS → Local Haversine
 
-- **Local Routing Functions** (`src/lib/routing/local/`):
-  - `calculateDistance()` - Haversine formula for accurate distance calculation
-  - `estimateDuration()` - ETA based on distance and average speed
-  - `calculateRouteEta()` - Total route duration estimation
-  - `buildLocalMatrix()` - Distance/duration matrix using Haversine
-  - `detectRouteDeviation()` - Check if user is off the planned route
-  - `createStraightLinePolyline()` - Simple polyline for fallback visualization
-  - `interpolateLine()` - Line interpolation for smooth fallback routes
-  - `createInterpolatedPolyline()` - Multi-segment polyline interpolation
-  - `compareRouteWithPosition()` - Compare current position to planned route
-  - `getEstimatedTimeRemaining()` - Time remaining based on current position
+- **Route Mode Selection**: Users can now choose between:
+  - **Circular route**: Return to start point (default, optimized distance)
+  - **Linear route**: Visit nearest points first, no return (for one-way deliveries)
 
-- **UI Notifications**:
-  - Warning banner when ORS API key is not configured
+- **Unified Address Search**: Created `useAddressSearch` hook to unify 3 different search inputs
+  - Used by AddressInput, StartPointSelector, and OCRUploader components
 
-#### Documentation
-- `docs/FEATURES.md` - Complete feature matrix with status indicators
-- `docs/ORS_FALLBACK.md` - Technical documentation of fallback system
-- README.md updated with feature status matrix
+- **OCR Address Suggestions**: After OCR text extraction, users now see geocoded address suggestions
+
+- **Execution Progress Persistence**: Fixed bug where route recalculation reset progress
+
+#### UI/UX Improvements
+- Fixed mobile layout issues preserving map visibility during scroll
+- Route numbering now reflects optimized order
+- Better error handling and loading states
+- RouteInfo shows actual values instead of "--" when duration/distance is 0
+
+#### PWA & Offline
+- Configured `runtimeCaching` for offline asset caching (tiles, fonts, scripts)
+
+### Fixed Bugs
+
+- **RouteInfo "--" display**: Changed from ternary to `Number.isFinite()` check
+- **Execution cancellation**: Fixed recalculation resetting `currentIndex` to 0
+- **Modal reappearing**: Added `isOpen` prop for explicit modal control
+- **OCR address flow**: Implemented proper suggestions display after OCR
 
 ### Changed
 
-- **API Endpoints**:
-  - `/api/route-optimize` - Now uses fallback system automatically
-  - `/api/matrix` - Now returns 503 with helpful message when ORS unavailable
-
-- **Route Display**:
-  - Map component displays straight-line polylines when ORS unavailable
-  - Visual indicator shows when fallback mode is active
+- Tech Stack updated:
+  - Next.js 16.1.6 (was 14+)
+  - React 19.2.3 (was 18+)
+  - Tailwind CSS 4 (was 3.x)
+  - Added `@vis.gl/react-google-maps` (replaced Leaflet)
+  - Removed Leaflet and `react-leaflet` packages
+  - Removed ORS as primary (now fallback only)
 
 ### Dependencies
 
-- No new dependencies added
+- Added: `@vis.gl/react-google-maps`
+- Removed: `leaflet`, `react-leaflet`, `@react-leaflet/core`
 
 ## [0.9.0] - 2026-02-01
 

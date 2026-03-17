@@ -9,7 +9,8 @@ This document details all features in Route Flow and their dependency on externa
 | Status | Description | Requires API Key |
 |--------|-------------|------------------|
 | ✅ ACTIVE | Primary implementation using Google Maps | Yes (Google Maps) |
-| ✅ FALLBACK | Works with ORS API when Google unavailable | Optional |
+| ✅ INDEPENDENT | Works without any external API | No |
+| ✅ FALLBACK | Works with fallback when primary unavailable | Optional |
 | 🔶 LEGACY | Deprecated, kept for backward compatibility | Optional |
 
 ## Feature Matrix
@@ -21,7 +22,8 @@ This document details all features in Route Flow and their dependency on externa
 | Address OCR | `src/components/OCRUploader/` | ✅ INDEPENDENT | None | N/A |
 | Address Input/Validation | `src/components/AddressInput/` | ✅ INDEPENDENT | None | N/A |
 | Address List Management | `src/components/AddressList/` | ✅ INDEPENDENT | None | N/A |
-| Route Optimization | `src/app/api/route-optimize/` | ✅ ACTIVE | Google Directions API | ORS → Haversine |
+| Route Mode Selection | `src/components/ExecutionPanel/` | ✅ INDEPENDENT | None | N/A |
+| Route Optimization | `src/app/api/route-optimize/` | ✅ ACTIVE | Google Directions API | ORS → Nearest-neighbor |
 | Distance Matrix | `src/app/api/matrix/` | ✅ ACTIVE | Google Distance Matrix API | ORS → Haversine |
 | Geocoding | `src/app/api/geocode/` | ✅ ACTIVE | Google Geocoding API | Nominatim |
 | Route Display | `src/components/Map/` | ✅ ACTIVE | Google Directions API | ORS → Straight polyline |
@@ -54,6 +56,7 @@ The app uses Google Maps Platform as the primary service:
 - **Directions API**: Route optimization (Traveling Salesman Problem)
 - **Distance Matrix API**: Duration and distance calculations
 - **Geocoding API**: Address to coordinates conversion
+- **Maps JavaScript API**: Interactive map display
 
 **Getting an API key:**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/)
@@ -62,6 +65,7 @@ The app uses Google Maps Platform as the primary service:
    - Directions API
    - Distance Matrix API
    - Geocoding API
+   - Maps JavaScript API
 4. Create credentials (API Key)
 5. Add to `.env.local`:
 
@@ -83,7 +87,7 @@ The app uses ORS only as a fallback:
 1. Register at [openrouteservice.org](https://openrouteservice.org)
 2. Create a free account
 3. Generate an API token
-4. Uncomment in `.env.local`:
+4. Add to `.env.local`:
 
 ```env
 NEXT_PUBLIC_ORS_API_KEY=your-ors-api-key-here
@@ -114,13 +118,25 @@ Located in `src/lib/routing/local/`:
 | `createStraightLinePolyline()` | Simple visualization | No |
 | `compareRouteWithPosition()` | Distance to planned route | No |
 
-## Migration History
+## Route Modes
 
-### March 2026 - Google Maps Migration
+### Circular Route (Default)
+- Returns to start point after all deliveries
+- Optimized for distance efficiency
+- Use case: Return to depot/warehouse
 
-- Migrated from ORS to Google Maps Platform as primary service
-- Added Google Directions, Distance Matrix, and Geocoding APIs
-- Implemented fallback chain: Google → ORS → Local Haversine
-- ORS code marked as @deprecated, kept for fallback compatibility
+### Linear Route
+- One-way route, no return to start
+- Visits nearest unvisited point first
+- Use case: End at final customer's location
 
-See [CHANGELOG.md](../CHANGELOG.md) for feature evolution.
+## Recent Updates (v1.0.0)
+
+- **March 2026**: Migrated from Leaflet/ORS to Google Maps Platform
+- Added route mode selection (circular/linear)
+- Unified address search with `useAddressSearch` hook
+- OCR address suggestions after text extraction
+- Fixed execution progress persistence
+- Improved mobile layout
+
+See [CHANGELOG.md](../CHANGELOG.md) for full feature evolution.

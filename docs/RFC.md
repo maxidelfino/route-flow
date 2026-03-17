@@ -8,7 +8,7 @@
 - Budget: $0 (free tier APIs only)
 - Users: 2 couriers in Argentina
 - Offline: Up to 3 hours without connectivity
-- Storage: Ephemeral (only persists on page reload for safety)
+- Storage: Persists on page reload for safety
 
 ---
 
@@ -21,9 +21,9 @@
 | Next.js | 16.x | Framework (requires Node.js 20.9+) |
 | React | 19.x | UI Library |
 | TypeScript | 5.x | Type safety |
-| Tailwind CSS | 3.x | Styling |
-| Leaflet + react-leaflet | 4.x | Maps |
-| Tesseract.js | 6.x | OCR (browser) |
+| Tailwind CSS | 4.x | Styling |
+| Google Maps | @vis.gl/react-google-maps | Maps |
+| Tesseract.js | 7.x | OCR (browser) |
 | idb | 8.x | IndexedDB wrapper |
 
 ### Backend
@@ -31,8 +31,9 @@
 | Technology | Purpose |
 |------------|---------|
 | Next.js API Routes | Serverless backend |
-| Nominatim | Geocoding (OpenStreetMap) |
-| OpenRouteService (ORS) | Routing & Matrix API |
+| Google Maps APIs | Primary: Directions, Distance Matrix, Geocoding |
+| OpenRouteService (ORS) | Fallback routing |
+| Nominatim | Fallback geocoding |
 
 ### PWA
 
@@ -53,28 +54,40 @@ route-flow/
 │   ├── app/
 │   │   ├── layout.tsx           # Root layout + PWA
 │   │   ├── page.tsx             # Main app
+│   │   ├── sw.ts                # Service worker
 │   │   └── api/                 # API Routes
-│   │       ├── geocode/         # Nominatim proxy
-│   │       ├── matrix/           # ORS matrix
-│   │       └── route/            # Route optimization
+│   │       ├── geocode/         # Google Geocoding proxy
+│   │       ├── matrix/          # Google Distance Matrix
+│   │       └── route-optimize/  # Google Directions + optimization
 │   ├── components/
-│   │   ├── Map/                 # Leaflet map
-│   │   ├── AddressList/         # Address management
-│   │   ├── OCRUploader/         # Photo + OCR
-│   │   ├── RouteInfo/           # Navigation info
-│   │   └── DragList/            # Reorderable list
+│   │   ├── Map/                 # Google Maps component
+│   │   ├── AddressList/         # Address management (dnd-kit)
+│   │   ├── AddressInput/       # Address input with autocomplete
+│   │   ├── OCRUploader/        # Photo + OCR
+│   │   ├── ExecutionPanel/     # Route execution mode
+│   │   ├── RouteInfo/          # Navigation info
+│   │   ├── StartPointSelector/ # Start point selection
+│   │   └── PWAInstallButton/   # PWA install prompt
 │   ├── lib/
-│   │   ├── ors.ts               # ORS client
-│   │   ├── geocode.ts           # Nominatim client
-│   │   ├── tsp.ts               # Nearest Neighbor + 2-opt
-│   │   ├── storage.ts           # IndexedDB (idb)
-│   │   └── gps.ts               # Device GPS
+│   │   ├── google-maps/         # Google Maps client
+│   │   │   ├── directions.ts   # Directions API wrapper
+│   │   │   ├── matrix.ts       # Distance Matrix wrapper
+│   │   │   ├── geocode.ts      # Geocoding wrapper
+│   │   │   └── polyline.ts    # Polyline decoder
+│   │   ├── routing/
+│   │   │   ├── local/          # Offline fallback algorithms
+│   │   │   │   ├── distance.ts # Haversine formula
+│   │   │   │   ├── matrix.ts   # Local matrix builder
+│   │   │   │   └── deviation.ts # Route deviation detection
+│   │   │   └── ors/            # ORS fallback (legacy)
+│   │   ├── tsp.ts              # TSP solver (nearest-neighbor + 2-opt)
+│   │   ├── db.ts               # IndexedDB operations
+│   │   └── useAddressSearch.ts # Unified address search hook
 │   └── hooks/
-│       ├── useRoute.ts          # Route state
+│       ├── useRoute.ts          # Route state management
 │       └── useGPS.ts            # GPS tracking
 ├── public/
-│   ├── manifest.json            # PWA manifest
-│   └── icons/                   # PWA icons
+│   └── manifest.json            # PWA manifest
 └── package.json
 ```
 
@@ -82,87 +95,47 @@ route-flow/
 
 ## 4. Key Technical Decisions
 
-### 4.1 PWA Implementation
+### 4.1 Google Maps Integration
 
-**Decision:** Use `@ducanh2912/next-pwa` (maintained fork of `next-pwa`)
-
-```bash
-npm install @ducanh2912/next-pwa
-```
-
-```javascript
-// next.config.mjs
-import NextPWA from '@ducanh2912/next-pwa';
-
-const nextConfig = {
-  // ... your config
-};
-
-export default NextPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-})(nextConfig);
-```
-
-**Manifest:**
-```json
-{
-  "name": "Route Flow",
-  "short_name": "RouteFlow",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
-}
-```
-
-### 4.2 Leaflet in Next.js App Router
-
-**Challenge:** Leaflet requires browser APIs (window, document) not available in SSR.
-
-**Solution:** Dynamic import with `ssr: false`
+**Decision:** Use `@vis.gl/react-google-maps` for map rendering
 
 ```typescript
 // src/components/Map/index.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
+import { APIProvider, Map, Marker, Polyline } from '@vis.gl/react-google-maps';
 
-const MapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-
-const TileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-
-export default function Map({ centers, route, onMarkerClick }) {
+export default function RouteMap({ center, zoom, route, markers }) {
   return (
-    <MapContainer center={centers[0]} zoom={13} style={{ height: '100%', width: '100%' }}>
-      <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {/* Markers and polylines */}
-    </MapContainer>
+    <APIProvider apiKey={process.env.GOOGLE_MAPS_API_KEY}>
+      <Map center={center} zoom={zoom} mapId="route-flow-map">
+        {markers.map(marker => (
+          <Marker key={marker.id} position={marker.position} />
+        ))}
+        {route && <Polyline path={route.polyline} />}
+      </Map>
+    </APIProvider>
   );
 }
 ```
 
-### 4.3 Tesseract.js OCR
+### 4.2 Fallback Chain
+
+**Decision:** Implement three-tier fallback for reliability
+
+```
+Google Maps API → OpenRouteService → Local Haversine
+     (primary)        (fallback 1)      (fallback 2)
+```
+
+### 4.3 Route Modes
+
+**Decision:** Support both circular and linear routes
+
+- **Circular (default)**: Return to start point, optimized distance
+- **Linear**: One-way, visit nearest first, no return
+
+### 4.4 Tesseract.js OCR
 
 **Decision:** Run in browser with web worker
 
@@ -178,12 +151,10 @@ export async function extractText(imageData: string): Promise<string> {
 }
 ```
 
-**Note:** Use `spa` (Spanish) language for better accuracy in Argentina.
-
-### 4.4 IndexedDB Storage (idb)
+### 4.5 IndexedDB Storage (idb)
 
 ```typescript
-// src/lib/storage.ts
+// src/lib/db.ts
 import { openDB, DBSchema } from 'idb';
 
 interface RouteDB extends DBSchema {
@@ -210,97 +181,22 @@ const dbPromise = openDB<RouteDB>('route-flow', 1, {
     db.createObjectStore('settings', { keyPath: 'key' });
   },
 });
-
-export const storage = {
-  async getAddresses() {
-    return (await dbPromise).getAll('addresses');
-  },
-  async addAddress(addr) {
-    return (await dbPromise).put('addresses', addr);
-  },
-  async deleteAddress(id) {
-    return (await dbPromise).delete('addresses', id);
-  },
-};
 ```
-
-### 4.5 ORS Integration
-
-**Client:** Use `openrouteservice-js` or direct fetch
-
-```typescript
-// src/lib/ors.ts
-const ORS_API_KEY = process.env.NEXT_PUBLIC_ORS_API_KEY;
-
-export async function getMatrix(coordinates: number[][]) {
-  const response = await fetch('https://api.openrouteservice.org/v2/matrix/driving-car', {
-    method: 'POST',
-    headers: {
-      'Authorization': ORS_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      locations: coordinates,
-      metrics: ['duration', 'distance'],
-      units: 'km',
-    }),
-  });
-  return response.json();
-}
-
-export async function getRoute(coordinates: number[][]) {
-  const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
-    method: 'POST',
-    headers: {
-      'Authorization': ORS_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      coordinates,
-      format: 'encodedpolyline',
-    }),
-  });
-  return response.json();
-}
-```
-
-### 4.6 Nominatim Geocoding
-
-```typescript
-// src/lib/geocode.ts
-export async function geocodeAddress(address: string) {
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=AR`
-  );
-  const results = await response.json();
-  
-  if (results.length === 0) {
-    throw new Error('Address not found');
-  }
-  
-  return {
-    lat: parseFloat(results[0].lat),
-    lng: parseFloat(results[0].lon),
-    displayName: results[0].display_name,
-  };
-}
-```
-
-**Rate Limiting:** 1 request/second (Nominatim policy). Implement delay between requests.
 
 ---
 
 ## 5. Algorithm: Route Optimization
 
-### 5.1 Strategy for MVP
+### 5.1 Strategy
 
-For 2 users and 100 addresses max (typical), implement:
+For MVP with typical 50-100 addresses:
 
-1. **Nearest Neighbor** as base algorithm
-2. **2-opt improvement** for local optimization
-3. **Weighted cost function:** `cost = 0.7 * time + 0.3 * distance`
+1. **Google Directions API** for primary optimization (when available)
+2. **Nearest Neighbor** as fallback base algorithm
+3. **2-opt improvement** for local optimization
+4. **Weighted cost function:** `cost = 0.7 * time + 0.3 * distance`
 
-### 5.2 Algorithm Implementation
+### 5.2 Implementation
 
 ```typescript
 // src/lib/tsp.ts
@@ -308,8 +204,8 @@ interface Point {
   id: string;
   lat: number;
   lng: number;
-  duration?: number;   // from matrix
-  distance?: number;  // from matrix
+  duration?: number;
+  distance?: number;
 }
 
 function weightedCost(time: number, distance: number): number {
@@ -352,50 +248,6 @@ function nearestNeighbor(
   }
 
   return route;
-}
-
-function twoOpt(route: number[], matrix: any): number[] {
-  let improved = true;
-  let bestRoute = [...route];
-  
-  while (improved) {
-    improved = false;
-    for (let i = 1; i < bestRoute.length - 1; i++) {
-      for (let j = i + 1; j < bestRoute.length; j++) {
-        const newRoute = bestRoute
-          .slice(0, i)
-          .concat(bestRoute.slice(i, j + 1).reverse())
-          .concat(bestRoute.slice(j + 1));
-        
-        if (routeCost(newRoute, matrix) < routeCost(bestRoute, matrix)) {
-          bestRoute = newRoute;
-          improved = true;
-        }
-      }
-    }
-  }
-  
-  return bestRoute;
-}
-
-function routeCost(route: number[], matrix: any): number {
-  let cost = 0;
-  for (let i = 0; i < route.length - 1; i++) {
-    cost += weightedCost(
-      matrix.durations[route[i]][route[i + 1]],
-      matrix.distances[route[i]][route[i + 1]]
-    );
-  }
-  return cost;
-}
-
-export function optimizeRoute(
-  points: Point[],
-  startIndex: number,
-  matrix: { durations: number[][]; distances: number[][] }
-): number[] {
-  const nn = nearestNeighbor(points, startIndex, matrix);
-  return twoOpt(nn, matrix);
 }
 ```
 
@@ -474,6 +326,7 @@ export function useGPS() {
 {
   durations: number[][];
   distances: number[][];
+  _provider: 'google' | 'ors' | 'local';
 }
 ```
 
@@ -484,17 +337,19 @@ export function useGPS() {
 {
   start: [number, number];        // [lng, lat]
   points: Array<{ id: string; lat: number; lng: number }>;
-  alpha: number;                   // time weight (default 0.7)
-  beta: number;                    // distance weight (default 0.3)
+  mode: 'circular' | 'linear';   // route mode
+  alpha?: number;                 // time weight (default 0.7)
+  beta?: number;                  // distance weight (default 0.3)
 }
 
 // Response
 {
-  route: string[];                 // ordered point IDs
-  polyline: string;                // encoded polyline
-  totalDuration: number;           // minutes
-  totalDistance: number;           // km
-  etas: number[];                  // ETA to each point
+  route: string[];                // ordered point IDs
+  polyline: [number, number][];  // decoded polyline
+  totalDuration: number;          // minutes
+  totalDistance: number;          // km
+  etas: number[];                // ETA to each point
+  _provider: 'google' | 'ors' | 'local';
 }
 ```
 
@@ -504,45 +359,45 @@ export function useGPS() {
 
 ```bash
 # .env.local
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+
+# Optional - for fallback
 NEXT_PUBLIC_ORS_API_KEY=your-ors-api-key
 ```
 
-**Note:** Get free API key at https://openrouteservice.org/dev/#/signup
-
 ---
 
-## 9. Implementation Phases
+## 9. Implementation Status
 
 ### Phase 1: Foundation ✅ COMPLETO
 - [x] Initialize Next.js project with TypeScript + Tailwind
 - [x] Set up PWA with next-pwa
-- [x] Configure Leaflet map component
+- [x] Configure Google Maps component
 - [x] Create IndexedDB storage layer
 
 ### Phase 2: Address Management ✅ COMPLETO
-- [x] Manual address input with Nominatim autocomplete
+- [x] Manual address input with Google autocomplete
 - [x] OCR upload with Tesseract.js
-- [x] Address list with drag & drop reordering
+- [x] Address list with drag & drop (dnd-kit)
 - [x] Address CRUD in IndexedDB
 
-### Phase 3: Route Calculation ⚠️ PARCIAL (requiere API key)
-- [x] ORS client implementation (lib/ors.ts)
-- [x] Nearest Neighbor + 2-opt algorithm (lib/tsp.ts)
-- [x] ORS matrix API integration (pendiente API key)
-- [x] ORS directions API integration (pendiente API key)
-- [ ] Route visualization on map
+### Phase 3: Route Calculation ✅ COMPLETO
+- [x] Google Maps client implementation
+- [x] TSP algorithm (nearest-neighbor + 2-opt)
+- [x] Google Directions API integration
+- [x] Fallback chain (ORS → Local)
 
-### Phase 4: Execution (en progreso)
-- [x] GPS tracking hook (useGPS.ts)
-- [ ] "Complete delivery" action UI
-- [ ] Dynamic route recalculation UI
-- [ ] Route deviation detection
+### Phase 4: Execution ✅ COMPLETO
+- [x] GPS tracking hook
+- [x] Complete delivery action UI
+- [x] Dynamic route recalculation
+- [x] Route deviation detection
 
-### Phase 5: Polish
-- [ ] Loading states and progress indicators
-- [ ] Offline mode handling
-- [ ] Error states and retry logic
-- [ ] PWA install prompts
+### Phase 5: MVP Polish ✅ COMPLETO
+- [x] Route mode selection (circular/linear)
+- [x] Loading states and progress indicators
+- [x] Offline mode handling
+- [x] PWA install prompts
 
 ---
 
@@ -550,34 +405,23 @@ NEXT_PUBLIC_ORS_API_KEY=your-ors-api-key
 
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
-| Nominatim rate limit | 1 req/sec | Add delay, cache results |
-| ORS free tier | 2000 req/day | Cache matrices, batch requests |
+| Google Maps API limits | 100-2500 req/day (tier) | Cache matrices, batch requests |
 | Tesseract accuracy | Varies | Always require user confirmation |
 | GPS precision | Varies by device | Show accuracy indicator |
-| Offline geocoding | Not possible | Queue for later |
+| Offline geocoding | Not possible | Queue for later when online |
 
 ---
 
 ## 11. References
 
-- [Nominatim Usage Policy](https://nominatim.org/release-docs/latest/admin/Usage-Policy/)
-- [OpenRouteService API](https://openrouteservice.org/dev/)
+- [Google Maps Platform](https://developers.google.com/maps)
+- [Google Maps JavaScript API](https://vis.gl/react-google-maps)
 - [Tesseract.js Documentation](https://tesseract.projectnaptha.com/)
-- [Leaflet React Integration](https://react-leaflet.js.org/)
 - [next-pwa Documentation](https://www.npmjs.com/package/@ducanh2912/next-pwa)
+- [OpenRouteService API](https://openrouteservice.org/dev/) (fallback)
 
 ---
 
-## 12. Next Steps
-
-After RFC approval:
-
-1. Initialize Next.js project
-2. Set up development environment
-3. Begin Phase 1 implementation
-4. Validate with 2 test users
-
----
-
-*Document version: 1.0*
-*Created: 2026-03-12*
+*Document version: 2.0*
+*Updated: 2026-03-17*
+*For MVP Release*

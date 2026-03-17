@@ -17,6 +17,7 @@ Route Flow is a route optimization application for delivery logistics. It solves
 | Drag & Drop | @dnd-kit |
 | Storage | IndexedDB (idb) |
 | Styling | Tailwind CSS 4 |
+| OCR | Tesseract.js |
 
 ## System Architecture
 
@@ -25,7 +26,7 @@ Route Flow is a route optimization application for delivery logistics. It solves
 │                        Client (Browser)                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ AddressList  │  │    Map       │  │   ExecutionPanel     │  │
-│  │ (dnd-kit)    │  │ (Google Maps)│  │   (GPS Tracking)     │  │
+│  │ (dnd-kit)    │  │(Google Maps)│  │   (GPS Tracking)     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │                           │                                      │
 │                    ┌──────┴──────┐                               │
@@ -77,7 +78,7 @@ import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 **Endpoint**: `/api/route-optimize`
 
 **Features**:
-- Round-trip optimization (start = end)
+- Round-trip optimization (start = end) or linear mode
 - `optimizeWaypoints=true` for TSP solving
 - Step-by-step navigation instructions
 - Encoded polyline for route visualization
@@ -144,6 +145,17 @@ import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 **Functions**:
 - Address to coordinates: `getGeocode({ address: "123 Main St" })`
 - Coordinates to address: `getAddress({ location: { lat, lng } })`
+
+## Fallback Chain
+
+When Google Maps API is unavailable:
+
+| Feature | Fallback 1 (ORS) | Fallback 2 (Local) |
+|---------|------------------|-------------------|
+| Route Optimization | ORS Directions API | Nearest-neighbor heuristic |
+| Distance Matrix | ORS Matrix API | Haversine formula |
+| Geocoding | Nominatim | Error message |
+| Route Display | ORS polyline | Straight-line polyline |
 
 ## Data Flow
 
@@ -274,6 +286,7 @@ type Action =
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GOOGLE_MAPS_API_KEY` | Yes | Google Maps Platform API key |
+| `NEXT_PUBLIC_ORS_API_KEY` | No | OpenRouteService (fallback) |
 
 ## Security
 
@@ -287,6 +300,17 @@ type Action =
 2. **Debounced Calculations**: Route recalculation is debounced during editing
 3. **Lazy Loading**: Map components are loaded lazily
 4. **IndexedDB**: Route data persisted locally to survive page refreshes
+
+## Route Modes
+
+### Circular Route (Default)
+- Starts from a point and returns to it
+- Optimized for distance efficiency
+- Use case: Return to depot after deliveries
+
+### Linear Route
+- Visits nearest points first, no return
+- Use case: One-way delivery routes (e.g., end at customer's location)
 
 ## Future Enhancements
 
