@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { addressStorage } from '@/lib/storage';
 import { geocodeAddressWithFallback } from '@/lib/geocode';
+import { API } from '@/lib/constants';
 
-const GEOCODE_DELAY_MS = 1000; // Rate limiting for Nominatim
+const GEOCODE_DELAY_MS = API.NOMINATIM.MIN_DELAY_MS;
 
 interface UseAutoGeocodeOptions {
   /** Maximum number of addresses to geocode in one batch */

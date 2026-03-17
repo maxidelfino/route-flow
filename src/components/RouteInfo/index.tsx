@@ -2,6 +2,7 @@
 
 import { RoutePoint } from '@/hooks/useRoute';
 import { calculateDistance } from '@/lib/routing/local/haversine';
+import { formatDistance, formatDuration, formatDurationRemaining } from '@/lib/format';
 
 interface RouteInfoProps {
   currentPoint: RoutePoint | null;
@@ -31,24 +32,6 @@ export function RouteInfo({
       </div>
     );
   }
-
-  // Format duration from minutes to hours/minutes
-  const formatDuration = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${Math.round(minutes)} min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
-
-  // Format distance
-  const formatDistance = (km: number): string => {
-    if (km < 1) {
-      return `${Math.round(km * 1000)} m`;
-    }
-    return `${km.toFixed(1)} km`;
-  };
 
   return (
     <div className="bg-card rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-200">

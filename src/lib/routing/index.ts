@@ -36,6 +36,8 @@
  */
 
 import * as local from './local';
+import { isApiKeyConfigured as checkORSApiKey } from '../ors';
+import { isGoogleMapsConfigured as checkGoogleMaps } from '../google-maps';
 
 export type { RouteResult } from './local';
 export type { Point, Matrix, Coordinate, PlannedRoute } from './local';
@@ -48,17 +50,12 @@ export const getMatrix = local.buildLocalMatrix;
  * Check if Google Maps API is configured
  * @returns true if GOOGLE_MAPS_API_KEY is set
  */
-export function isApiKeyConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_MAPS_API_KEY);
-}
+export const isApiKeyConfigured = checkORSApiKey;
 
 /**
  * Check if Google Maps API is available
- * @deprecated Use isApiKeyConfigured() instead
  */
-export function isGoogleMapsConfigured(): boolean {
-  return isApiKeyConfigured();
-}
+export const isGoogleMapsConfigured = checkGoogleMaps;
 
 /**
  * Legacy function - use /api/route-optimize instead

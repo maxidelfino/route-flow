@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDistance, formatDuration } from '@/lib/format';
+
 interface RouteSummaryProps {
   totalDuration: number;
   totalDistance: number;
@@ -13,22 +15,6 @@ export function RouteSummary({
   completedCount,
   onNewRoute,
 }: RouteSummaryProps) {
-  const formatDuration = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${Math.round(minutes)} min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
-
-  const formatDistance = (km: number): string => {
-    if (km < 1) {
-      return `${Math.round(km * 1000)} m`;
-    }
-    return `${km.toFixed(1)} km`;
-  };
-
   return (
     <div className="bg-card rounded-lg shadow-md p-6 space-y-6 hover:shadow-lg transition-all duration-200">
       {/* Header */}

@@ -1,22 +1,7 @@
 import { cacheStorage } from './storage';
+import { rateLimitNominatim } from './rate-limit';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
-const RATE_LIMIT_MS = 1000; // 1 request per second
-
-let lastRequestTime = 0;
-
-async function rateLimit(): Promise<void> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-  
-  if (timeSinceLastRequest < RATE_LIMIT_MS) {
-    await new Promise(resolve => 
-      setTimeout(resolve, RATE_LIMIT_MS - timeSinceLastRequest)
-    );
-  }
-  
-  lastRequestTime = Date.now();
-}
 
 export interface GeocodeResult {
   lat: number;
@@ -54,7 +39,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
     return cached;
   }
 
-  await rateLimit();
+  await rateLimitNominatim();
 
   const url = `${NOMINATIM_BASE}/search?format=json&q=${encodeURIComponent(address)}&countrycodes=AR&limit=1`;
   
@@ -95,7 +80,7 @@ export async function searchAddresses(query: string): Promise<SearchResult[]> {
     return [];
   }
 
-  await rateLimit();
+  await rateLimitNominatim();
 
   // Add Rosario context to improve results for local users
   const enhancedQuery = /rosario|santa fe/i.test(query) 
@@ -128,7 +113,7 @@ export async function searchAddresses(query: string): Promise<SearchResult[]> {
  * Reverse geocode: coordinates to address
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  await rateLimit();
+  await rateLimitNominatim();
 
   const url = `${NOMINATIM_BASE}/reverse?format=json&lat=${lat}&lon=${lng}`;
   

@@ -17,6 +17,7 @@ import { ErrorToast } from '@/components/ErrorToast';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { RouteSummary } from '@/components/RouteSummary';
 import { Address } from '@/lib/storage';
+import { formatDuration } from '@/lib/format';
 
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
@@ -100,16 +101,6 @@ export default function Home() {
       calculateBothRouteTimes();
     }
   }, [state.status, state.startPoint, state.points.length, calculateBothRouteTimes]);
-
-  // Format duration for display
-  const formatDuration = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${Math.round(minutes)} min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
 
   const handleAddressesChange = useCallback(async (_addresses: Address[]) => {
     await loadAddresses();

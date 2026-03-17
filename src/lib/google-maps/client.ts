@@ -16,15 +16,14 @@ import {
 } from './types';
 import { decodePolyline } from './polyline';
 import { validateCoordinates, validateAddress, isWithinRosarioBounds, isAcceptableLocationType, normalizeAddress } from './validation';
+import { API } from '../constants';
 
 const GOOGLE_DIRECTIONS_BASE = 'https://maps.googleapis.com/maps/api/directions/json';
 const GOOGLE_GEOCODING_BASE = 'https://maps.googleapis.com/maps/api/geocode/json';
 const GOOGLE_MATRIX_BASE = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 
-// Retry configuration
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff in ms
-const REQUEST_TIMEOUT = 10000; // 10 seconds
+// Use centralized API constants
+const { MAX_RETRIES, RETRY_DELAYS, REQUEST_TIMEOUT } = API.GOOGLE_MAPS;
 
 /**
  * Google Maps API Client

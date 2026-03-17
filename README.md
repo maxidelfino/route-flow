@@ -26,14 +26,64 @@ PWA para optimizar rutas de entrega. Carga hasta 1000 direcciones (manual o OCR)
 # Install dependencies
 npm install
 
+# Install GGA hooks (AI Code Review)
+npm run gga:install
+
 # Run development server
 npm run dev
+```
 
-# Run tests
-npm run test
+## Scripts
 
-# Build for production
-npm run build
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests in watch mode |
+| `npm run test:run` | Run tests once |
+| `npm run gga:install` | Install GGA hooks |
+| `npm run gga:run` | Run GGA review manually |
+
+## GGA - AI Code Review
+
+Route Flow uses [Gentleman Guardian Angel (GGA)](https://github.com/Gentleman-Programming/gentleman-guardian-angel) for AI-powered code review.
+
+### Setup
+
+```bash
+npm run gga:install
+```
+
+Configure your AI provider in `.gga`:
+
+```bash
+# Use Ollama (local, free)
+PROVIDER=ollama:llama3
+
+# Or use Claude
+PROVIDER=claude
+# Set ANTHROPIC_API_KEY environment variable
+
+# Or use Gemini
+PROVIDER=gemini
+# Set GEMINI_API_KEY environment variable
+```
+
+### How It Works
+
+- **pre-commit**: Reviews staged files before commit
+- **pre-push**: Runs tests + GGA review before push
+- **CI**: Runs GGA review on every PR
+
+### Bypass Hooks
+
+```bash
+# Skip pre-commit
+git commit --no-verify -m "message"
+
+# Skip pre-push
+git push --no-verify
 ```
 
 ## Features
@@ -104,4 +154,4 @@ Si Google Maps no está disponible, la app usa:
 
 ---
 
-**Version**: 1.0.0 - MVP Release
+**Version**: 1.1.0 - Refactor + CI/CD Release
