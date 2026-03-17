@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-17
+
+### Added
+
+#### Code Refactoring & Reusability
+- **Shared Utilities**: Created centralized utilities to eliminate code duplication
+  - `format.ts`: `formatDistance()`, `formatDuration()`, `formatDistanceCompact()`
+  - `rate-limit.ts`: Reusable rate limiter for external APIs
+  - `constants.ts`: Centralized constants for API configuration
+
+- **Reusable Components**: Created base components following container-presentational pattern
+  - `Banner`: Base component with variants (info, warning, error, success, accent)
+  - `Overlay`: Reusable modal/dialog overlay with click-outside and Escape handling
+  - `Button`: Button with variants (primary, secondary, outline, ghost, danger, success) and sizes
+  - `Card`: Card component with CardHeader, CardTitle, CardDescription, CardContent, CardFooter
+
+- **Hooks**
+  - `useEventListener`: Reusable hook for DOM event subscriptions
+
+- **Tests**: Added 25+ unit tests for new components and utilities
+  - `format.test.ts`, `rate-limit.test.ts`, `constants.test.ts`
+  - `Banner.test.tsx`, `Overlay.test.tsx`, `Button.test.tsx`, `Card.test.tsx`
+  - `ConfirmDialog.test.tsx`, `LoadingSpinner.test.tsx`, `ErrorToast.test.tsx`
+
+#### CI/CD & Code Quality
+- **GitHub Actions CI**: Created `.github/workflows/ci.yml`
+  - Runs lint, tests, and build on push/PR
+  - Runs GGA AI code review on PRs
+
+- **GGA Integration**: Added Gentleman Guardian Angel for AI-powered code review
+  - `AGENTS.md`: Coding standards documentation
+  - `.gga`: GGA configuration
+  - `scripts/setup-hooks.sh`: Hook installation script
+  - Pre-commit hook: Reviews staged files before commit
+  - Pre-push hook: Runs tests + GGA review before push
+
+### Changed
+
+- **Refactored Components**: Updated to use shared utilities
+  - `RouteSummary`, `RouteInfo`, `page.tsx`: Use `format.ts`
+  - `DeviationBanner`, `OfflineBanner`, `ORSWarningBanner`: Use `Banner` component
+  - `ConfirmDialog`: Uses `Overlay` component
+  - `google-maps.ts`: Re-exports `decodePolyline` from `polyline.ts`
+  - `geocode.ts`: Uses `rate-limit.ts`
+  - `routing/index.ts`: Re-exports API configuration functions
+
+- **Updated Dependencies**
+  - Added `vitest` test runner
+
+### Fixed
+
+- Eliminated duplicate `decodePolyline` function (was in 2 places)
+- Eliminated duplicate `formatDistance`/`formatDuration` functions (was in 3 components)
+- Eliminated duplicate API configuration functions (`isGoogleMapsConfigured`, `isApiKeyConfigured`)
+
 ## [1.0.0] - 2026-03-17
 
 ### Added
