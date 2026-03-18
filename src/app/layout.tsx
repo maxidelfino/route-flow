@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={poppins.variable}>
+    <html lang="es" suppressHydrationWarning className={poppins.variable}>
       <body className="antialiased">
         <ORSWarningBanner />
         {children}

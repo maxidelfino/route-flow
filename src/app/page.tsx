@@ -29,6 +29,7 @@ export default function Home() {
     state, 
     setStartPoint, 
     loadAddresses, 
+    setPoints,
     calculateRoute, 
     startExecution, 
     completeCurrentPoint, 
@@ -102,9 +103,9 @@ export default function Home() {
     }
   }, [state.status, state.startPoint, state.points.length, calculateBothRouteTimes]);
 
-  const handleAddressesChange = useCallback(async (_addresses: Address[]) => {
-    await loadAddresses();
-  }, [loadAddresses]);
+  const handleAddressesChange = useCallback((_addresses: Address[]) => {
+    setPoints(_addresses);
+  }, [setPoints]);
 
   // Build markers array: start point first, then delivery points
   const markers: MapMarker[] = [
@@ -296,7 +297,7 @@ export default function Home() {
 
       {/* Control Panel - Glassmorphism */}
       <div className={`
-        ${isMobile ? 'flex-1 flex flex-col' : 'w-[420px] flex flex-col overflow-visible'}
+        ${isMobile ? 'flex-1 flex flex-col' : 'w-[420px] flex flex-col overflow-y-auto'}
         glass-dark rounded-t-2xl md:rounded-none
         border-t-2 md:border-t-0 md:border-l border-border/30
         z-20
@@ -359,7 +360,7 @@ export default function Home() {
         )}
 
         {/* Tab Content */}
-        <div className={`${isMobile ? 'h-[calc(60vh-140px)] min-h-0' : 'flex-1'} ${isMobile ? 'flex flex-col' : ''} overflow-hidden p-4 md:p-6`}>
+        <div className={`${isMobile ? 'h-[calc(60vh-140px)] min-h-0' : 'flex-1'} ${isMobile ? 'flex flex-col' : ''} ${isMobile ? 'overflow-hidden' : 'overflow-y-auto'} p-4 md:p-6`}>
           {/* Desktop: Always show all components in stacked layout */}
           {/* Mobile: Show only active tab */}
           
@@ -393,6 +394,7 @@ export default function Home() {
                 ref={addressListRef}
                 onAddressesChange={handleAddressesChange}
                 scrollable={isMobile}
+                hasStartPoint={!!state.startPoint}
               />
             </div>
           </div>

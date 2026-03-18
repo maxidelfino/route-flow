@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { addressStorage } from '@/lib/storage';
+import { addressStorage, Address } from '@/lib/storage';
 
 export type RouteStatus = 'idle' | 'loading' | 'ready' | 'executing' | 'completed';
 export type OptimizeMode = 'linear' | 'circular';
@@ -258,10 +258,29 @@ export function useRoute() {
     setState(initialState);
   }, []);
 
+  // Update points directly (for when addresses change)
+  const setPoints = useCallback((addresses: Address[]) => {
+    const geocoded = addresses.filter(a => a.lat && a.lng);
+    const points: RoutePoint[] = geocoded.map(a => ({
+      id: a.id,
+      address: a.text,
+      lat: a.lat!,
+      lng: a.lng!,
+      status: 'pending' as const,
+    }));
+    
+    setState(prev => ({
+      ...prev,
+      points,
+      status: points.length > 0 && prev.startPoint ? 'ready' : prev.status === 'executing' ? 'executing' : 'idle',
+    }));
+  }, []);
+
   return {
     state,
     setStartPoint,
     loadAddresses,
+    setPoints,
     calculateRoute,
     startExecution,
     completeCurrentPoint,

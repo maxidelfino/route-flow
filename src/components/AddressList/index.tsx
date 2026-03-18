@@ -29,6 +29,7 @@ interface AddressItemProps {
   address: Address;
   index: number;
   onDelete: (id: string) => void;
+  hasStartPoint?: boolean;
 }
 
 function SortableAddressItem({ address, index, onDelete }: AddressItemProps) {
@@ -160,9 +161,10 @@ function SortableAddressItem({ address, index, onDelete }: AddressItemProps) {
 interface AddressListProps {
   onAddressesChange?: (addresses: Address[]) => void;
   scrollable?: boolean;
+  hasStartPoint?: boolean;
 }
 
-export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAddressesChange, scrollable = false }, ref) => {
+export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAddressesChange, scrollable = false, hasStartPoint = false }, ref) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -170,14 +172,26 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
   const onAddressesChangeRef = useRef(onAddressesChange);
   const addressesRef = useRef(addresses);
   onAddressesChangeRef.current = onAddressesChange;
-  addressesRef.current = addresses;
+  
+  // Keep addressesRef in sync with state
+  useEffect(() => {
+    addressesRef.current = addresses;
+  }, [addresses]);
+
+  // Call onAddressesChange when addresses change (but not on initial mount)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    onAddressesChangeRef.current?.(addresses);
+  }, [addresses]);
   
   // Auto-geocode pending addresses and refresh map when done
   const { isGeocoding, geocodedCount, failedCount, currentAddress, geocodePendingAddresses } = useAutoGeocode({
     onGeocodeComplete: () => {
-      // Trigger the callback to refresh the map after geocoding completes
-      // Use ref to get fresh addresses
-      onAddressesChangeRef.current?.(addressesRef.current);
+      // Address changes will be caught by the addresses useEffect above
     },
   });
 
@@ -211,12 +225,8 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
       // Add to storage first
       await addressStorage.add(newAddress);
       
-      // Then update state
-      setAddresses(prev => {
-        const updated = [...prev, newAddress];
-        onAddressesChange?.(updated);
-        return updated;
-      });
+      // Then update state (onAddressesChange will be called via useEffect)
+      setAddresses(prev => [...prev, newAddress]);
     },
   }));
 
@@ -232,7 +242,7 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
           order: addr.order ?? idx,
         }));
         setAddresses(withOrder);
-        onAddressesChange?.(withOrder);
+        // onAddressesChange will be called via the addresses change effect above
       } catch (error) {
         console.error('Failed to load addresses:', error);
       } finally {
@@ -240,13 +250,13 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
       }
     };
     loadAddresses();
-  }, [onAddressesChange]);
+  }, []);
 
   const handleDelete = async (id: string) => {
     await addressStorage.delete(id);
     const updated = addresses.filter(a => a.id !== id);
     setAddresses(updated);
-    onAddressesChange?.(updated);
+    // onAddressesChange will be called via useEffect
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -267,9 +277,11 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
       }
 
       setAddresses(newAddresses);
-      onAddressesChange?.(newAddresses);
+      // onAddressesChange will be called via useEffect
     }
   };
+
+  console.log({addresses})
 
   if (isLoading) {
     return (
@@ -385,6 +397,7 @@ export const AddressList = forwardRef<AddressListRef, AddressListProps>(({ onAdd
                   address={address}
                   index={index}
                   onDelete={handleDelete}
+                  hasStartPoint={hasStartPoint}
                 />
               ))}
             </div>

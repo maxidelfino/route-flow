@@ -19,12 +19,10 @@ function getIsInstalled(): boolean {
 
 export function usePWAInstall() {
   const [canInstall, setCanInstall] = useState<boolean>(false);
-  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
     // Initialize isInstalled lazily
     setIsInstalled(getIsInstalled());
 
@@ -65,7 +63,7 @@ export function usePWAInstall() {
 
   return {
     canInstall,
-    isInstalled: isInstalled ?? getIsInstalled(),
+    isInstalled,
     prompt,
   };
 }

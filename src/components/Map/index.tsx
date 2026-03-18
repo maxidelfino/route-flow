@@ -91,10 +91,12 @@ function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRender
 function CustomMarker({ 
   marker, 
   index, 
+  markers,
   onClick 
 }: { 
   marker: MapMarker; 
-  index: number; 
+  index: number;
+  markers: MapMarker[];
   onClick?: () => void 
 }) {
   const color = useMemo(() => {
@@ -110,7 +112,14 @@ function CustomMarker({
     }
   }, [marker.status]);
 
-  const displayNumber = marker.status === 'start' ? 0 : index;
+  // Calculate correct display number: count non-start markers before this one
+  const displayNumber = useMemo(() => {
+    if (marker.status === 'start') return '0';
+    
+    // Count how many delivery markers come before this one
+    const deliveryIndex = markers.slice(0, index).filter(m => m.status !== 'start').length;
+    return deliveryIndex + 1;
+  }, [marker.status, index, markers]);
 
   return (
     <AdvancedMarker
@@ -253,6 +262,7 @@ function MapContent({
           key={marker.id}
           marker={marker}
           index={index}
+          markers={markers}
           onClick={() => onMarkerClick?.(marker.id)}
         />
       ))}
