@@ -325,6 +325,249 @@ export async function reverseGeocode(lat: number, lng: number): Promise<{
  * Get distance matrix for multiple origins and destinations
  * Useful for calculating travel times and distances between multiple points
  */
+/**
+ * Validates that coordinates are within valid latitude/longitude ranges
+ * @throws {Error} If any coordinate is out of range
+ */
+function validateCoordinates(coordinates: [number, number][]): void {
+  for (let i = 0; i < coordinates.length; i++) {
+    const [lat, lng] = coordinates[i];
+    if (lat < -90 || lat > 90) {
+      throw new Error(
+        `Invalid latitude ${lat} at index ${i}. Must be between -90 and 90.`
+      );
+    }
+    if (lng < -180 || lng > 180) {
+      throw new Error(
+        `Invalid longitude ${lng} at index ${i}. Must be between -180 and 180.`
+      );
+    }
+  }
+}
+
+/**
+ * Estimate duration using Haversine distance formula
+ * Used as fallback when Distance Matrix API fails
+ * 
+ * @param from - Origin coordinate [lat, lng]
+ * @param to - Destination coordinate [lat, lng]
+ * @param avgSpeedKmh - Assumed average speed (default: 50 km/h for urban)
+ * @returns Estimated duration in seconds
+ */
+function estimateDurationFromHaversine(
+  from: [number, number],
+  to: [number, number],
+  avgSpeedKmh = 50
+): number {
+  // Handle same point
+  if (from[0] === to[0] && from[1] === to[1]) {
+    return 0;
+  }
+  
+  const R = 6371; // Earth's radius in km
+  const [lat1, lon1] = from;
+  const [lat2, lon2] = to;
+  
+  // Convert to radians
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  
+  // Haversine formula
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c;
+  
+  // Convert to duration in seconds
+  const durationHours = distanceKm / avgSpeedKmh;
+  const durationSeconds = Math.round(durationHours * 3600);
+  
+  return durationSeconds;
+}
+
+/**
+ * Calculate duration matrix using Google Distance Matrix API
+ * 
+ * Uses optimized batching strategy:
+ * - N ≤ 25: Single batch (fast path)
+ * - N > 25: 2D batching with 25×25 chunks
+ * 
+ * Automatically falls back to Haversine distance estimation for:
+ * - Elements with status !== 'OK' (e.g., ZERO_RESULTS, NOT_FOUND)
+ * - Batches that fail due to network errors
+ * 
+ * @param coordinates - Array of [latitude, longitude] tuples
+ * @returns Promise<number[][]> - N×N matrix of durations in seconds
+ * 
+ * @throws {Error} If all batches fail (API unavailable)
+ * @throws {Error} If coordinates are invalid (out of range)
+ * 
+ * @example
+ * ```typescript
+ * const coords: [number, number][] = [
+ *   [40.7128, -74.0060], // NYC
+ *   [34.0522, -118.2437], // LA
+ * ];
+ * const durations = await getDurationMatrix(coords);
+ * // [[0, 14400], [14400, 0]] (example values in seconds)
+ * ```
+ * 
+ * Performance:
+ * - N=31: ~2s (4 batches)
+ * - N=100: ~8s (16 batches)
+ * - N=300: ~72s (144 batches) - consider using clustering instead
+ */
+export async function getDurationMatrix(
+  coordinates: [number, number][] // Array of [lat, lng]
+): Promise<number[][]> {
+  const n = coordinates.length;
+  
+  // Edge cases
+  if (n === 0) return [];
+  if (n === 1) return [[0]];
+  
+  // Validate coordinates
+  validateCoordinates(coordinates);
+  
+  // Google Distance Matrix API has limits:
+  // - Maximum 100 elements per request (Standard plan: origins × destinations)
+  // - Maximum 625 elements per request (Premium plan: 25 origins × 25 destinations)
+  // With 2D batching at 25 per dimension: 25×25 = 625 elements per batch (Premium limit)
+  // For N ≤ 25: single batch. For N > 25: ceil(N/25)² batches.
+  const MAX_PER_DIMENSION = 25; // Google API hard limit (Premium plan: 25×25=625 elements)
+  
+  // Fast path: N ≤ 25 (single batch)
+  if (n <= MAX_PER_DIMENSION) {
+    try {
+      const response = await getDistanceMatrix(coordinates, coordinates);
+      const durations: number[][] = Array(n).fill(null).map(() => Array(n).fill(0));
+      
+      for (let i = 0; i < response.rows.length; i++) {
+        for (let j = 0; j < response.rows[i].elements.length; j++) {
+          const element = response.rows[i].elements[j];
+          
+          if (element.status === 'OK') {
+            durations[i][j] = element.duration.value;
+          } else {
+            // Fallback to Haversine
+            durations[i][j] = estimateDurationFromHaversine(
+              coordinates[i],
+              coordinates[j]
+            );
+            console.warn(
+              `Element status ${element.status} at [${i}][${j}], using Haversine estimate`
+            );
+          }
+        }
+      }
+      
+      return durations;
+    } catch (error) {
+      console.error('Fast path failed, falling back to Haversine for all elements:', error);
+      
+      // Complete fallback
+      const durations: number[][] = Array(n).fill(null).map(() => Array(n).fill(0));
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          durations[i][j] = estimateDurationFromHaversine(coordinates[i], coordinates[j]);
+        }
+      }
+      return durations;
+    }
+  }
+  
+  // 2D Batching: N > 25
+  const durations: number[][] = Array(n).fill(null).map(() => Array(n).fill(0));
+  let successfulBatches = 0;
+  let failedBatches = 0;
+  const totalBatches = Math.ceil(n / MAX_PER_DIMENSION) ** 2;
+  
+  console.log(
+    `[getDurationMatrix] N=${n}, batches=${totalBatches}, using 2D batching`
+  );
+  
+  // Nested loop: batch BOTH dimensions
+  for (let i = 0; i < n; i += MAX_PER_DIMENSION) {
+    for (let j = 0; j < n; j += MAX_PER_DIMENSION) {
+      const iEnd = Math.min(i + MAX_PER_DIMENSION, n);
+      const jEnd = Math.min(j + MAX_PER_DIMENSION, n);
+      
+      const originBatch = coordinates.slice(i, iEnd);
+      const destBatch = coordinates.slice(j, jEnd);
+      
+      console.log(
+        `[Batch ${successfulBatches + failedBatches + 1}/${totalBatches}] ` +
+        `origins[${i}-${iEnd-1}] × destinations[${j}-${jEnd-1}] ` +
+        `(${originBatch.length}×${destBatch.length} = ${originBatch.length * destBatch.length} elements)`
+      );
+      
+      try {
+        const response = await getDistanceMatrix(originBatch, destBatch);
+        successfulBatches++;
+        
+        // Map batch results to global matrix
+        for (let row = 0; row < response.rows.length; row++) {
+          const globalRow = i + row;
+          for (let col = 0; col < response.rows[row].elements.length; col++) {
+            const globalCol = j + col;
+            const element = response.rows[row].elements[col];
+            
+            if (element.status === 'OK') {
+              durations[globalRow][globalCol] = element.duration.value;
+            } else {
+              // Element-level fallback
+              durations[globalRow][globalCol] = estimateDurationFromHaversine(
+                coordinates[globalRow],
+                coordinates[globalCol]
+              );
+              console.warn(
+                `Element status ${element.status} at [${globalRow}][${globalCol}], using Haversine`
+              );
+            }
+          }
+        }
+      } catch (error) {
+        // Batch-level fallback
+        failedBatches++;
+        console.error(
+          `Batch failed at origins ${i}-${iEnd-1}, destinations ${j}-${jEnd-1}:`,
+          error
+        );
+        
+        for (let row = i; row < iEnd; row++) {
+          for (let col = j; col < jEnd; col++) {
+            durations[row][col] = estimateDurationFromHaversine(
+              coordinates[row],
+              coordinates[col]
+            );
+          }
+        }
+      }
+    }
+  }
+  
+  // Check for complete failure
+  if (successfulBatches === 0 && failedBatches > 0) {
+    throw new Error(
+      `Distance Matrix API unavailable. All ${failedBatches} batches failed.`
+    );
+  }
+  
+  if (failedBatches > 0) {
+    console.warn(
+      `${failedBatches} of ${totalBatches} batches failed. ` +
+      `Route uses estimated distances for failed segments.`
+    );
+  }
+  
+  return durations;
+}
+
 export async function getDistanceMatrix(
   origins: Array<[number, number] | string>,
   destinations: Array<[number, number] | string>,
