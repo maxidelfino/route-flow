@@ -45,44 +45,61 @@ export function StartPointSelector({ onStartPointSelect, initialPoint, isOpen }:
   const handleUseCurrentLocation = async () => {
     setGpsError(null);
     setIsLoadingAddress(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          
-          let address = 'Ubicación actual';
-          try {
-            const reverseAddress = await reverseGeocode(lat, lng);
-            address = simplifyAddress(reverseAddress);
-          } catch (error) {
-            console.warn('Reverse geocoding failed, using fallback:', error);
-          }
-          
-          onStartPointSelect(lat, lng, address);
-          setShowSelector(false);
-          setIsLoadingAddress(false);
-        },
-        (error) => {
-          setIsLoadingAddress(false);
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              setGpsError('Permiso de ubicación denegado. Por favor habilita el acceso a tu ubicación en la configuración del navegador.');
-              break;
-            case error.POSITION_UNAVAILABLE:
-              setGpsError('No se pudo obtener tu ubicación. Intenta de nuevo o usa ingreso manual.');
-              break;
-            case error.TIMEOUT:
-              setGpsError('La ubicación tomó demasiado tiempo. Intenta de nuevo o usa ingreso manual.');
-              break;
-            default:
-              setGpsError('Error al obtener ubicación. Intenta de nuevo o usa ingreso manual.');
-          }
-        }
-      );
-    } else {
+    
+    if (!navigator.geolocation) {
       setGpsError('Tu navegador no soporta geolocalización. Usa ingreso manual.');
+      setIsLoadingAddress(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        
+        let address = 'Ubicación actual';
+        try {
+          const reverseAddress = await reverseGeocode(lat, lng);
+          address = simplifyAddress(reverseAddress);
+        } catch (error) {
+          console.warn('Reverse geocoding failed, using fallback:', error);
+        }
+        
+        onStartPointSelect(lat, lng, address);
+        setShowSelector(false);
+        setIsLoadingAddress(false);
+      },
+      (error) => {
+        setIsLoadingAddress(false);
+        
+        let errorMessage: string;
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Permiso de ubicación denegado. Por favor habilita el acceso a tu ubicación en la configuración del navegador.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'No se pudo obtener tu ubicación. Intenta de nuevo o usa ingreso manual.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'La ubicación tomó demasiado tiempo. Intenta de nuevo o usa ingreso manual.';
+            break;
+          default:
+            if (error.message) {
+              errorMessage = `Error al obtener ubicación: ${error.message}`;
+            } else {
+              errorMessage = 'Error al obtener ubicación. Intenta de nuevo o usa ingreso manual.';
+            }
+        }
+        
+        setGpsError(errorMessage);
+        console.warn('Geolocation error:', error.message, 'code:', error.code);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   };
 
   const validateManualInput = (): boolean => {
@@ -156,6 +173,8 @@ export function StartPointSelector({ onStartPointSelect, initialPoint, isOpen }:
   const handleButtonClick = () => {
     setShowSelector(!showSelector);
   };
+
+  console.log({initialPoint})
 
   return (
     <div className="relative">

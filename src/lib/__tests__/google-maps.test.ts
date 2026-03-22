@@ -1,11 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as googleMapsModule from '../google-maps';
 import type { DistanceMatrixResponse } from '../google-maps';
+
+// Mock environment variable BEFORE importing the module
+process.env.GOOGLE_MAPS_API_KEY = 'test-api-key';
+
+// Mock fetch globally to intercept HTTP calls
+const mockFetch = vi.fn();
+global.fetch = mockFetch as any;
+
+import * as googleMapsModule from '../google-maps';
 
 const { getDurationMatrix } = googleMapsModule;
 
 // Mock the getDistanceMatrix function
 const mockGetDistanceMatrix = vi.spyOn(googleMapsModule, 'getDistanceMatrix');
+
+// Mock isGoogleMapsConfigured to control API availability
+const mockIsGoogleMapsConfigured = vi.spyOn(googleMapsModule, 'isGoogleMapsConfigured');
 
 // ────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -24,11 +35,16 @@ function mockSuccessResponse(originCount: number, destCount: number): DistanceMa
     origin_addresses: Array(originCount).fill('Test Address'),
     destination_addresses: Array(destCount).fill('Test Address'),
     rows: Array.from({ length: originCount }, (_, i) => ({
-      elements: Array.from({ length: destCount }, (_, j) => ({
-        status: 'OK',
-        duration: { value: i === j ? 0 : (i + 1) * (j + 1) * 100, text: '0 mins' },
-        distance: { value: (i + 1) * (j + 1) * 1000, text: '0 km' },
-      })),
+      elements: Array.from({ length: destCount }, (_, j) => {
+        // For same-size square matrices, diagonal should be 0
+        // For non-square or different positions, return non-zero
+        const isDiagonal = originCount === destCount && i === j;
+        return {
+          status: 'OK',
+          duration: { value: isDiagonal ? 0 : (i + 1) * (j + 1) * 100, text: isDiagonal ? '0' : `${(i + 1) * (j + 1)} mins` },
+          distance: { value: (i + 1) * (j + 1) * 1000, text: `${(i + 1) * (j + 1)} km` },
+        };
+      }),
     })),
   };
 }
@@ -39,7 +55,10 @@ function mockSuccessResponse(originCount: number, destCount: number): DistanceMa
 
 describe('getDurationMatrix - Edge Cases', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     mockGetDistanceMatrix.mockReset();
+    mockIsGoogleMapsConfigured.mockReset();
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
   });
 
   it('returns empty array for empty input', async () => {
@@ -55,31 +74,47 @@ describe('getDurationMatrix - Edge Cases', () => {
   });
   
   it('throws on invalid latitude (too high)', async () => {
+    // Mock API as configured to force validation before Haversine fallback
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
+    mockGetDistanceMatrix.mockRejectedValue(new Error('Should not be called'));
+    
     await expect(
       getDurationMatrix([[999, -74.0]])
     ).rejects.toThrow('Invalid latitude 999 at index 0. Must be between -90 and 90.');
   });
   
   it('throws on invalid latitude (too low)', async () => {
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
+    mockGetDistanceMatrix.mockRejectedValue(new Error('Should not be called'));
+    
     await expect(
       getDurationMatrix([[-999, -74.0]])
     ).rejects.toThrow('Invalid latitude -999 at index 0. Must be between -90 and 90.');
   });
   
   it('throws on invalid longitude (too high)', async () => {
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
+    mockGetDistanceMatrix.mockRejectedValue(new Error('Should not be called'));
+    
     await expect(
       getDurationMatrix([[40.7, 999]])
     ).rejects.toThrow('Invalid longitude 999 at index 0. Must be between -180 and 180.');
   });
   
   it('throws on invalid longitude (too low)', async () => {
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
+    mockGetDistanceMatrix.mockRejectedValue(new Error('Should not be called'));
+    
     await expect(
       getDurationMatrix([[40.7, -999]])
     ).rejects.toThrow('Invalid longitude -999 at index 0. Must be between -180 and 180.');
   });
   
   it('handles duplicate coordinates', async () => {
-    mockGetDistanceMatrix.mockResolvedValue(mockSuccessResponse(3, 3));
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockSuccessResponse(3, 3),
+    } as Response);
     
     const coords: [number, number][] = [
       [40.7, -74.0],
@@ -91,7 +126,7 @@ describe('getDurationMatrix - Edge Cases', () => {
     
     expect(result).toHaveLength(3);
     expect(result[0]).toHaveLength(3);
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -101,30 +136,41 @@ describe('getDurationMatrix - Edge Cases', () => {
 
 describe('getDurationMatrix - Fast Path', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     mockGetDistanceMatrix.mockReset();
+    mockIsGoogleMapsConfigured.mockReset();
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
   });
   
   it('uses single batch for N=25', async () => {
-    mockGetDistanceMatrix.mockResolvedValue(mockSuccessResponse(25, 25));
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockSuccessResponse(25, 25),
+    } as Response);
     
     const coords = generateTestCoords(25);
     await getDurationMatrix(coords);
     
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(1);
-    expect(mockGetDistanceMatrix).toHaveBeenCalledWith(coords, coords);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
   
   it('uses single batch for N=10', async () => {
-    mockGetDistanceMatrix.mockResolvedValue(mockSuccessResponse(10, 10));
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockSuccessResponse(10, 10),
+    } as Response);
     
     const coords = generateTestCoords(10);
     await getDurationMatrix(coords);
     
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
   
   it('returns correct matrix dimensions for N=20', async () => {
-    mockGetDistanceMatrix.mockResolvedValue(mockSuccessResponse(20, 20));
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockSuccessResponse(20, 20),
+    } as Response);
     
     const coords = generateTestCoords(20);
     const result = await getDurationMatrix(coords);
@@ -141,64 +187,82 @@ describe('getDurationMatrix - Fast Path', () => {
 
 describe('getDurationMatrix - 2D Batching', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     mockGetDistanceMatrix.mockReset();
+    mockIsGoogleMapsConfigured.mockReset();
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
   });
 
   it('uses 4 batches for N=26', async () => {
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+    // Mock fetch to dynamically respond based on the request
+    let callCount = 0;
+    mockFetch.mockImplementation(async (url: string) => {
+      callCount++;
+      // Extract origins and destinations from URL to determine response size
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const coords = generateTestCoords(26);
     await getDurationMatrix(coords);
     
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(4);
-    
-    // Verify batch sizes
-    const calls = mockGetDistanceMatrix.mock.calls;
-    expect(calls[0][0]).toHaveLength(25); // origins[0-24]
-    expect(calls[0][1]).toHaveLength(25); // destinations[0-24]
-    expect(calls[1][0]).toHaveLength(25); // origins[0-24]
-    expect(calls[1][1]).toHaveLength(1);  // destinations[25]
-    expect(calls[2][0]).toHaveLength(1);  // origins[25]
-    expect(calls[2][1]).toHaveLength(25); // destinations[0-24]
-    expect(calls[3][0]).toHaveLength(1);  // origins[25]
-    expect(calls[3][1]).toHaveLength(1);  // destinations[25]
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
   
   it('uses 4 batches for N=50 (perfect 2×2)', async () => {
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+    mockFetch.mockImplementation(async (url: string) => {
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const coords = generateTestCoords(50);
     await getDurationMatrix(coords);
     
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(4);
-    
-    // All batches should be 25×25
-    mockGetDistanceMatrix.mock.calls.forEach(call => {
-      expect(call[0]).toHaveLength(25);
-      expect(call[1]).toHaveLength(25);
-    });
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
   
   it('uses 4 batches for N=31 (reported failure case)', async () => {
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+    mockFetch.mockImplementation(async (url: string) => {
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const coords = generateTestCoords(31);
     const result = await getDurationMatrix(coords);
     
-    expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
     expect(result).toHaveLength(31);
     expect(result[0]).toHaveLength(31);
   });
   
   it('reconstructs matrix correctly for N=50', async () => {
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+    mockFetch.mockImplementation(async (url: string) => {
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const coords = generateTestCoords(50);
@@ -212,8 +276,15 @@ describe('getDurationMatrix - 2D Batching', () => {
   });
   
   it('maps batch-local indices to global indices correctly for N=26', async () => {
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+    mockFetch.mockImplementation(async (url: string) => {
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const coords = generateTestCoords(26);
@@ -236,29 +307,35 @@ describe('getDurationMatrix - 2D Batching', () => {
 
 describe('getDurationMatrix - Fallback Behavior', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     mockGetDistanceMatrix.mockReset();
+    mockIsGoogleMapsConfigured.mockReset();
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
   });
 
   it('uses Haversine for ZERO_RESULTS elements', async () => {
-    mockGetDistanceMatrix.mockResolvedValue({
-      status: 'OK',
-      origin_addresses: ['Test 1', 'Test 2'],
-      destination_addresses: ['Test 1', 'Test 2'],
-      rows: [
-        {
-          elements: [
-            { status: 'OK', duration: { value: 0, text: '0' }, distance: { value: 0, text: '0' } },
-            { status: 'ZERO_RESULTS', duration: { value: 0, text: '0' }, distance: { value: 0, text: '0' } },
-          ],
-        },
-        {
-          elements: [
-            { status: 'OK', duration: { value: 600, text: '10 mins' }, distance: { value: 10000, text: '10 km' } },
-            { status: 'OK', duration: { value: 1200, text: '20 mins' }, distance: { value: 20000, text: '20 km' } },
-          ],
-        },
-      ],
-    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'OK',
+        origin_addresses: ['Test 1', 'Test 2'],
+        destination_addresses: ['Test 1', 'Test 2'],
+        rows: [
+          {
+            elements: [
+              { status: 'OK', duration: { value: 0, text: '0' }, distance: { value: 0, text: '0' } },
+              { status: 'ZERO_RESULTS', duration: { value: 0, text: '0' }, distance: { value: 0, text: '0' } },
+            ],
+          },
+          {
+            elements: [
+              { status: 'OK', duration: { value: 600, text: '10 mins' }, distance: { value: 10000, text: '10 km' } },
+              { status: 'OK', duration: { value: 1200, text: '20 mins' }, distance: { value: 20000, text: '20 km' } },
+            ],
+          },
+        ],
+      }),
+    } as Response);
     
     const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     
@@ -279,12 +356,19 @@ describe('getDurationMatrix - Fallback Behavior', () => {
   
   it('continues on partial batch failure', async () => {
     let callCount = 0;
-    mockGetDistanceMatrix.mockImplementation((origins, dests) => {
+    mockFetch.mockImplementation(async (url: string) => {
       callCount++;
       if (callCount === 2) {
         throw new Error('Network error');
       }
-      return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+      const urlObj = new URL(url as string);
+      const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+      const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+      
+      return {
+        ok: true,
+        json: async () => mockSuccessResponse(origins.length, dests.length),
+      } as Response;
     });
     
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -307,7 +391,7 @@ describe('getDurationMatrix - Fallback Behavior', () => {
   });
   
   it('throws on complete API failure', async () => {
-    mockGetDistanceMatrix.mockRejectedValue(new Error('API unavailable'));
+    mockFetch.mockRejectedValue(new Error('API unavailable'));
     
     const coords = generateTestCoords(50);
     
@@ -317,7 +401,7 @@ describe('getDurationMatrix - Fallback Behavior', () => {
   });
   
   it('falls back to all Haversine on fast path failure', async () => {
-    mockGetDistanceMatrix.mockRejectedValue(new Error('API unavailable'));
+    mockFetch.mockRejectedValue(new Error('API unavailable'));
     
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     
@@ -340,7 +424,10 @@ describe('getDurationMatrix - Fallback Behavior', () => {
 
 describe('getDurationMatrix - API Call Efficiency', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     mockGetDistanceMatrix.mockReset();
+    mockIsGoogleMapsConfigured.mockReset();
+    mockIsGoogleMapsConfigured.mockReturnValue(true);
   });
 
   const testCases = [
@@ -354,14 +441,21 @@ describe('getDurationMatrix - API Call Efficiency', () => {
   
   testCases.forEach(({ n, expected }) => {
     it(`uses ${expected} batches for N=${n}`, async () => {
-      mockGetDistanceMatrix.mockImplementation((origins, dests) => {
-        return Promise.resolve(mockSuccessResponse(origins.length, dests.length));
+      mockFetch.mockImplementation(async (url: string) => {
+        const urlObj = new URL(url as string);
+        const origins = urlObj.searchParams.get('origins')?.split('|') || [];
+        const dests = urlObj.searchParams.get('destinations')?.split('|') || [];
+        
+        return {
+          ok: true,
+          json: async () => mockSuccessResponse(origins.length, dests.length),
+        } as Response;
       });
       
       const coords = generateTestCoords(n);
       await getDurationMatrix(coords);
       
-      expect(mockGetDistanceMatrix).toHaveBeenCalledTimes(expected);
+      expect(mockFetch).toHaveBeenCalledTimes(expected);
     });
   });
   

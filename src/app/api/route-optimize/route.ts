@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDirections, decodePolyline, isGoogleMapsConfigured } from '@/lib/google-maps';
-import { optimizeAndCalculate, optimizeRouteLocal, optimizeRouteLinear, Point } from '@/lib/tsp';
+import { optimizeAndCalculate, optimizeRouteLocal, optimizeRouteLinear, optimizeRouteWithMatrix, Point } from '@/lib/tsp';
 import { createStraightLinePolyline } from '@/lib/routing/local';
 
 export type OptimizeMode = 'linear' | 'circular';
@@ -172,13 +172,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fallback to local optimization with Haversine distances
+    // Fallback to local optimization
     isFallback = true;
     
-    // Use linear or circular based on mode
-    if (mode === 'linear') {
+    // For linear routes with Google Maps configured, use Distance Matrix API
+    // This provides real routing distances instead of Haversine (straight-line)
+    // Clustering breaks linear routes by forcing completion of all cluster points
+    // before moving to the next cluster, causing excessive backtracking
+    if (mode === 'linear' && isGoogleMapsConfigured()) {
+      try {
+        // Use Distance Matrix with nearest neighbor + 2-opt (no clustering)
+        const matrixResult = await optimizeRouteWithMatrix(
+          tspPoints,
+          { lat: start[1], lng: start[0] },
+          false // linear mode: no return to start
+        );
+        
+        result = {
+          route: matrixResult.route,
+          totalDuration: matrixResult.totalDuration,
+          totalDistance: matrixResult.totalDistance,
+          etas: matrixResult.etas,
+        };
+        
+        googleMapsUsed = true;
+        isFallback = false;
+      } catch (matrixError) {
+        console.warn('Google Distance Matrix failed, using Haversine fallback:', matrixError);
+        // Fall through to Haversine fallback below
+        result = optimizeRouteLinear(tspPoints, { lat: start[1], lng: start[0] });
+      }
+    } else if (mode === 'linear') {
+      // No Google Maps configured - use Haversine fallback
       result = optimizeRouteLinear(tspPoints, { lat: start[1], lng: start[0] });
     } else {
+      // Circular mode fallback
       result = optimizeRouteLocal(tspPoints, { lat: start[1], lng: start[0] });
     }
     
@@ -205,8 +233,8 @@ export async function POST(request: NextRequest) {
         message: 'No routing service available - using fallback local with Haversine',
       } : undefined,
       _googleMaps: {
-        used: false,
-        optimized: false,
+        used: googleMapsUsed,
+        optimized: googleOptimized,
       },
     };
 

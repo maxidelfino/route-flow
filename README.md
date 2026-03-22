@@ -66,13 +66,18 @@ npm run test:coverage
 | 📱 PWA instalable | ✅ INDEPENDENT | Service Worker + Manifest |
 | 🔌 Funciona offline | ✅ INDEPENDENT | IndexedDB para datos |
 | 📊 Matriz de distancias | ✅ ACTIVE | Google Distance Matrix API |
-| 🎯 Optimización de ruta (TSP) | ✅ ACTIVE | Google Directions + algoritmo 2-opt |
-| 🔀 Modo de ruta (circular/lineal) | ✅ INDEPENDENT | Elegir retorno al inicio o no |
+| 🎯 Optimización de ruta (TSP) | ✅ ACTIVE | Google Directions + Distance Matrix + algoritmo 2-opt |
+| 🔀 Modo de ruta (circular/lineal) | ✅ ACTIVE | Circular: clustering + TSP / Linear: Nearest Neighbor + 2-opt |
 
 ### Estados de Features
 - **INDEPENDENT**: Funciona sin API key externa
 - **ACTIVE**: Usa Google Maps API como primario
 - **FALLBACK**: Usa ORS o cálculo local cuando Google no está disponible
+
+### Optimización de Rutas
+
+- **Modo Circular**: Usa clustering (k-means) + TSP para rutas que regresan al punto de inicio. Ideal para retorno a depósito.
+- **Modo Lineal**: Usa Distance Matrix + Nearest Neighbor + 2-opt para rutas progresivas sin retorno. Perfecto para entregas secuenciales (probado con 31 direcciones en Rosario, Argentina). Funciona bien hasta 300 direcciones.
 
 ## Configuración
 

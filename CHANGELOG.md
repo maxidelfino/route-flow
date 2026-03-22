@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Linear routing algorithm**: Linear routes now use Google Distance Matrix + Nearest Neighbor + 2-opt instead of clustering, eliminating chaotic backtracking for delivery routes with 31+ addresses. Clustering is now exclusive to circular routes.
+
 ## [1.1.0] - 2026-03-17
 
 ### Added

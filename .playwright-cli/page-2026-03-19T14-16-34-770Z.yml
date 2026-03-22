@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e7]:
+        - generic:
+          - button "Keyboard shortcuts"
+        - region "Map" [ref=e8]
+        - generic [ref=e9]:
+          - iframe [ref=e49]:
+            
+          - button "Toggle fullscreen view" [ref=e50] [cursor=pointer]
+          - generic:
+            - generic:
+              - button "Map camera controls" [ref=e52] [cursor=pointer]
+              - generic [ref=e54] [cursor=pointer]:
+                - button "Zoom in" [ref=e55]
+                - button "Zoom out" [ref=e57]
+          - link "Open this area in Google Maps (opens a new window)" [ref=e59] [cursor=pointer]:
+            - /url: https://maps.google.com/maps?ll=-32.9468,-60.6393&z=14&t=m&hl=en-US&gl=US&mapclient=apiv3
+            - img "Google" [ref=e61]
+          - generic [ref=e62]:
+            - button "Keyboard shortcuts" [ref=e68] [cursor=pointer]
+            - generic [ref=e73]: Map data ©2026 Google
+            - link "Terms (opens in new tab)" [ref=e78] [cursor=pointer]:
+              - /url: https://www.google.com/intl/en-US_US/help/terms_maps.html
+              - text: Terms
+      - button "Punto de inicio" [ref=e81]:
+        - img [ref=e82]
+        - generic [ref=e85]: Punto de inicio
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - img [ref=e91]
+          - generic [ref=e94]:
+            - heading "Direcciones" [level=2] [ref=e95]
+            - paragraph [ref=e96]: Agrega los puntos de entrega
+        - generic [ref=e98]:
+          - generic:
+            - img
+          - textbox "Buscar dirección..." [ref=e99]
+        - generic [ref=e102]:
+          - img [ref=e107]
+          - paragraph [ref=e110]: ¿Sin direcciones todavía?
+          - paragraph [ref=e111]: Agregá tu primera dirección para comenzar a planificar tu ruta
+          - generic [ref=e112]:
+            - img [ref=e113]
+            - generic [ref=e115]: Usá el formulario de arriba
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - img [ref=e119]
+          - generic [ref=e122]:
+            - heading "OCR" [level=2] [ref=e123]
+            - paragraph [ref=e124]: Escanear direcciones
+        - generic [ref=e126]:
+          - button "Tomar foto / Elegir imagen" [ref=e127] [cursor=pointer]:
+            - img [ref=e128]
+            - text: Tomar foto / Elegir imagen
+          - paragraph [ref=e131]: Saca una foto de la dirección en la planilla
+  - button "Open Next.js Dev Tools" [ref=e137] [cursor=pointer]:
+    - img [ref=e138]
+  - alert [ref=e141]

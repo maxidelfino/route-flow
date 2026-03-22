@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorToast } from '@/components/ErrorToast';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { RouteSummary } from '@/components/RouteSummary';
+import { RouteCalculationLoader } from '@/components/RouteCalculationLoader';
 import { Address } from '@/lib/storage';
 import { formatDuration } from '@/lib/format';
 
@@ -42,6 +43,15 @@ export default function Home() {
   const addressListRef = useRef<AddressListRef>(null);
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [routeMode, setRouteMode] = useState<'linear' | 'circular'>('circular');
+
+  // Handle recalculate with start point check
+  const handleRecalculate = () => {
+    if (!state.startPoint) {
+      setError('⚠️ Selecciona un punto de inicio primero');
+      return;
+    }
+    calculateRoute(undefined, routeMode);
+  };
   
   // Estimated times for both route modes
   const [routeTimes, setRouteTimes] = useState<{
@@ -161,8 +171,11 @@ export default function Home() {
       await addressListRef.current?.addAddress(address, lat, lng);
       await loadAddresses();
       
-      if (state.startPoint && state.points.length > 0 && state.status !== 'executing') {
-        await calculateRoute(undefined, routeMode);
+      const currentStartPoint = state.startPoint;
+      const currentStatus = state.status;
+      
+      if (currentStartPoint && state.points.length > 0 && currentStatus !== 'executing') {
+        await calculateRoute(currentStartPoint, routeMode);
       }
     } catch {
       setError('Error al agregar dirección');
@@ -214,6 +227,10 @@ export default function Home() {
   };
 
   const handleStartExecution = () => {
+    if (!state.startPoint) {
+      setError('⚠️ Selecciona un punto de inicio primero');
+      return;
+    }
     startExecution();
     setActiveTab('execution');
   };
@@ -281,6 +298,9 @@ export default function Home() {
             route={routeCoords}
             currentPosition={currentPosition}
           />
+          
+          {/* Route Calculation Loader Overlay */}
+          <RouteCalculationLoader isVisible={state.status === 'loading'} />
         </div>
         
         {/* StartPointSelector overlay - desktop only */}
@@ -466,7 +486,7 @@ export default function Home() {
                 onAddStop={() => setActiveTab('addresses')}
                 route={routeCoords}
                 onPositionUpdate={setCurrentPosition}
-                onRecalculate={() => calculateRoute(undefined, routeMode)}
+                onRecalculate={handleRecalculate}
                 nextPoint={state.points[state.currentIndex + 1] || null}
                 routeMode={routeMode}
                 onRouteModeChange={setRouteMode}

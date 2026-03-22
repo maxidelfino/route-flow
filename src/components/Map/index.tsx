@@ -26,65 +26,143 @@ export interface MapProps {
 const ROSARIO_CENTER = { lat: -32.9468, lng: -60.6393 };
 const MAP_ID = 'route-flow-map';
 
+const MAX_WAYPOINTS_PER_SEGMENT = 23;
+const ROUTE_COLOR = '#14b8a6';
+
 interface DirectionsRendererProps {
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   waypoints: Array<{ lat: number; lng: number }>;
 }
 
+function splitIntoSegments(
+  points: Array<{ lat: number; lng: number }>
+): Array<{ origin: { lat: number; lng: number }; destination: { lat: number; lng: number }; waypoints: Array<{ lat: number; lng: number }> }> {
+  if (points.length <= 2) {
+    return [];
+  }
+
+  if (points.length <= MAX_WAYPOINTS_PER_SEGMENT) {
+    return [{ origin: points[0], destination: points[points.length - 1], waypoints: points.slice(1, -1) }];
+  }
+
+  const segments: Array<{ origin: { lat: number; lng: number }; destination: { lat: number; lng: number }; waypoints: Array<{ lat: number; lng: number }> }> = [];
+  let currentIndex = 0;
+
+  while (currentIndex < points.length) {
+    const remainingPoints = points.length - currentIndex;
+    const segmentSize = Math.min(MAX_WAYPOINTS_PER_SEGMENT + 1, remainingPoints);
+    
+    const segmentPoints = points.slice(currentIndex, currentIndex + segmentSize);
+    
+    if (segmentPoints.length < 2) {
+      break;
+    }
+    
+    const origin = segmentPoints[0];
+    const destination = segmentPoints[segmentPoints.length - 1];
+    const waypoints = segmentPoints.slice(1, -1);
+
+    if (segmentPoints.length === 2) {
+      segments.push({ origin, destination, waypoints: [] });
+    } else {
+      segments.push({ origin, destination, waypoints });
+    }
+    
+    // Move forward by (segmentSize - 1) to create overlap: next segment starts at last point of current
+    // This ensures consecutive segments share an endpoint, allowing polylines to connect smoothly
+    currentIndex += segmentSize - 1;
+  }
+
+  return segments;
+}
+
 function DirectionsRenderer({ origin, destination, waypoints }: DirectionsRendererProps) {
   const map = useMap();
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
+  const [polylines, setPolylines] = useState<google.maps.Polyline[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const segments = useMemo(() => {
+    if (!origin || !destination) return [];
+    return splitIntoSegments([origin, ...waypoints, destination]);
+  }, [origin, destination, waypoints]);
 
   useEffect(() => {
     if (!map) return;
 
-    // Create service and renderer
+    polylines.forEach(pl => pl.setMap(null));
+    setPolylines([]);
+    setError(null);
+
+    if (!origin || !destination || segments.length === 0) return;
+
     const service = new google.maps.DirectionsService();
-    const renderer = new google.maps.DirectionsRenderer({
-      map,
-      suppressMarkers: true,
-      preserveViewport: false,
-      polylineOptions: {
-        strokeColor: '#14b8a6', // teal-500
-        strokeWeight: 5,
-        strokeOpacity: 0.9,
-      },
+    const newPolylines: google.maps.Polyline[] = [];
+    let pendingRequests = 0;
+
+    segments.forEach((segment, segmentIndex) => {
+      if (segment.waypoints.length === 0) {
+        const directPolyline = new google.maps.Polyline({
+          path: [segment.origin, segment.destination],
+          strokeColor: ROUTE_COLOR,
+          strokeWeight: 5,
+          strokeOpacity: 0.9,
+          map,
+        });
+        newPolylines.push(directPolyline);
+        return;
+      }
+
+      pendingRequests++;
+      service.route({
+        origin: new google.maps.LatLng(segment.origin.lat, segment.origin.lng),
+        destination: new google.maps.LatLng(segment.destination.lat, segment.destination.lng),
+        waypoints: segment.waypoints.map(wp => ({
+          location: new google.maps.LatLng(wp.lat, wp.lng),
+          stopover: true,
+        })),
+        optimizeWaypoints: false,
+        travelMode: google.maps.TravelMode.DRIVING,
+      }, (result, status) => {
+        pendingRequests--;
+
+        if (status === 'OK' && result) {
+          const route = result.routes[0];
+          const polyline = new google.maps.Polyline({
+            path: route.overview_path,
+            strokeColor: ROUTE_COLOR,
+            strokeWeight: 5,
+            strokeOpacity: 0.9,
+            map,
+          });
+          newPolylines.push(polyline);
+        } else {
+          console.error(`Directions API error for segment ${segmentIndex}:`, status);
+          if (status === 'MAX_WAYPOINTS_EXCEEDED') {
+            setError(`Too many waypoints in segment ${segmentIndex + 1}`);
+          }
+        }
+
+        if (pendingRequests === 0) {
+          setPolylines(newPolylines);
+        }
+      });
     });
 
-    setDirectionsService(service);
-    setDirectionsRenderer(renderer);
+    if (pendingRequests === 0 && segments.length > 0) {
+      setPolylines(newPolylines);
+    }
 
     return () => {
-      renderer.setMap(null);
+      newPolylines.forEach(pl => pl.setMap(null));
     };
-  }, [map]);
+  }, [map, origin, destination, segments]);
 
-  useEffect(() => {
-    if (!directionsService || !directionsRenderer || !origin || !destination) return;
-
-    const request: google.maps.DirectionsRequest = {
-      origin: new google.maps.LatLng(origin.lat, origin.lng),
-      destination: new google.maps.LatLng(destination.lat, destination.lng),
-      waypoints: waypoints.map(wp => ({
-        location: new google.maps.LatLng(wp.lat, wp.lng),
-        stopover: true,
-      })),
-      optimizeWaypoints: false,
-      travelMode: google.maps.TravelMode.DRIVING,
-    };
-
-    directionsService.route(request, (result, status) => {
-      if (status === 'OK' && result) {
-        directionsRenderer.setDirections(result);
-      } else {
-        console.error('Directions API error:', status);
-      }
-    });
-  }, [directionsService, directionsRenderer, origin, destination, waypoints]);
-
-  return null;
+  return error ? (
+    <div className="absolute top-4 left-4 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-4 py-2 rounded-lg text-sm">
+      {error}
+    </div>
+  ) : null;
 }
 
 // Custom marker component using AdvancedMarker with modern styling

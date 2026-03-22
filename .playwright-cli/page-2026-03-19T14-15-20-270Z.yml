@@ -1,0 +1,84 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e69]:
+        - generic:
+          - button "Keyboard shortcuts"
+        - region "Map" [ref=e70]
+        - generic [ref=e71]:
+          - iframe [ref=e114]:
+            
+          - button "Toggle fullscreen view" [ref=e115] [cursor=pointer]
+          - generic:
+            - generic:
+              - button "Map camera controls" [ref=e193] [cursor=pointer]
+              - generic [ref=e195] [cursor=pointer]:
+                - button "Zoom in" [ref=e196]
+                - button "Zoom out" [ref=e198]
+          - link "Open this area in Google Maps (opens a new window)" [ref=e124] [cursor=pointer]:
+            - /url: https://maps.google.com/maps?ll=-32.9468,-60.6393&z=14&t=m&hl=en-US&gl=US&mapclient=apiv3
+            - img "Google" [ref=e126]
+          - generic [ref=e127]:
+            - button "Keyboard shortcuts" [ref=e133] [cursor=pointer]
+            - generic [ref=e138]: Map data ©2026 Google
+            - link "Terms (opens in new tab)" [ref=e143] [cursor=pointer]:
+              - /url: https://www.google.com/intl/en-US_US/help/terms_maps.html
+              - text: Terms
+      - generic [ref=e6]:
+        - button "Punto de inicio" [ref=e7]:
+          - img [ref=e8]
+          - generic [ref=e11]: Punto de inicio
+        - generic [ref=e166]:
+          - generic [ref=e167]:
+            - img [ref=e169]
+            - generic [ref=e171]:
+              - heading "Punto de inicio" [level=3] [ref=e172]
+              - paragraph [ref=e173]: Selecciona cómo definir tu ubicación
+          - generic [ref=e174]:
+            - button "GPS" [ref=e175]
+            - button "Buscar" [ref=e176]
+            - button "Manual" [active] [ref=e177]
+          - generic [ref=e199]:
+            - generic [ref=e200]:
+              - generic [ref=e201]: Latitud (-90 a 90)
+              - textbox "Latitud (-90 a 90)" [ref=e202]:
+                - /placeholder: "Ej: -34.6037"
+            - generic [ref=e203]:
+              - generic [ref=e204]: Longitud (-180 a 180)
+              - textbox "Longitud (-180 a 180)" [ref=e205]:
+                - /placeholder: "Ej: -58.3816"
+            - button "Confirmar coordenadas" [ref=e206]
+          - button [ref=e186]:
+            - img [ref=e187]
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - img [ref=e17]
+          - generic [ref=e20]:
+            - heading "Direcciones" [level=2] [ref=e21]
+            - paragraph [ref=e22]: Agrega los puntos de entrega
+        - generic [ref=e24]:
+          - generic:
+            - img
+          - textbox "Buscar dirección..." [ref=e25]
+        - generic [ref=e144]:
+          - img [ref=e149]
+          - paragraph [ref=e152]: ¿Sin direcciones todavía?
+          - paragraph [ref=e153]: Agregá tu primera dirección para comenzar a planificar tu ruta
+          - generic [ref=e154]:
+            - img [ref=e155]
+            - generic [ref=e157]: Usá el formulario de arriba
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - img [ref=e45]
+          - generic [ref=e48]:
+            - heading "OCR" [level=2] [ref=e49]
+            - paragraph [ref=e50]: Escanear direcciones
+        - generic [ref=e52]:
+          - button "Tomar foto / Elegir imagen" [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+            - text: Tomar foto / Elegir imagen
+          - paragraph [ref=e57]: Saca una foto de la dirección en la planilla
+  - button "Open Next.js Dev Tools" [ref=e63] [cursor=pointer]:
+    - img [ref=e64]
+  - alert [ref=e158]: Route Flow - Optimizador de Rutas

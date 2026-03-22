@@ -305,12 +305,52 @@ type Action =
 
 ### Circular Route (Default)
 - Starts from a point and returns to it
+- **Algorithm**: k-means clustering + TSP per cluster
 - Optimized for distance efficiency
 - Use case: Return to depot after deliveries
+- Works well up to 300+ addresses
 
 ### Linear Route
-- Visits nearest points first, no return
-- Use case: One-way delivery routes (e.g., end at customer's location)
+- Visits nearest points first, no return to start
+- **Algorithm**: Nearest Neighbor (greedy) + 2-opt (local search)
+- Uses Google Distance Matrix API for real routing distances
+- Use case: One-way delivery routes (e.g., progressive deliveries without depot return)
+- Works well up to 300 addresses
+- **Why no clustering**: Clustering forces completion of all points in a cluster before moving to the next, causing chaotic backtracking in linear delivery routes
+
+## TSP Optimization Strategy
+
+Route Flow uses different optimization algorithms depending on route mode:
+
+### Linear Mode Algorithm
+1. **Distance Matrix**: Fetch real driving distances via Google Distance Matrix API (batched for >25 addresses)
+2. **Nearest Neighbor**: Greedy algorithm that always picks the closest unvisited point
+3. **2-opt Improvement**: Local search that eliminates edge crossings by reversing route segments
+4. **Result**: Smooth progressive route without backtracking
+
+### Circular Mode Algorithm
+1. **k-means Clustering**: Group nearby addresses into geographical clusters
+2. **TSP per Cluster**: Solve the traveling salesman problem within each cluster
+3. **Inter-cluster Ordering**: Optimize the order of visiting clusters
+4. **Result**: Efficient round-trip that returns to start point
+
+### Why Different Algorithms?
+
+**Problem with clustering for linear routes**: When using k-means clustering on a linear delivery route (e.g., 31 addresses spread across a city), the algorithm forces the driver to complete ALL deliveries in cluster A before moving to cluster B. This causes extreme backtracking:
+
+```
+Start → Cluster A (north) → Complete all A → 
+Travel back south → Cluster B → Complete all B → 
+Travel back north → Cluster C
+```
+
+Instead of the intuitive linear progression:
+
+```
+Start → Nearest → Next nearest → Next nearest → ... → End
+```
+
+**Solution**: Linear routes use Nearest Neighbor + 2-opt with real Google Maps distances, eliminating clustering entirely. This creates a smooth, progressive delivery path.
 
 ## Future Enhancements
 

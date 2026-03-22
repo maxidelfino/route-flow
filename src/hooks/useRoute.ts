@@ -269,10 +269,14 @@ export function useRoute() {
       status: 'pending' as const,
     }));
     
+    // Note: status should be 'ready' if there are points, even without startPoint
+    // The button will be visible, but actual route execution requires startPoint
+    const newStatus = points.length > 0 ? 'ready' : 'idle';
+    
     setState(prev => ({
       ...prev,
       points,
-      status: points.length > 0 && prev.startPoint ? 'ready' : prev.status === 'executing' ? 'executing' : 'idle',
+      status: prev.status === 'executing' ? 'executing' : newStatus,
     }));
   }, []);
 

@@ -427,12 +427,14 @@ export async function getDurationMatrix(
 ): Promise<number[][]> {
   const n = coordinates.length;
   
-  // Edge cases
+  // Edge case: empty array
   if (n === 0) return [];
-  if (n === 1) return [[0]];
   
-  // Validate coordinates
+  // Validate coordinates BEFORE any processing
   validateCoordinates(coordinates);
+  
+  // Edge case: single coordinate
+  if (n === 1) return [[0]];
   
   // Google Distance Matrix API has limits:
   // - Maximum 100 elements per request (Standard plan: origins × destinations)
